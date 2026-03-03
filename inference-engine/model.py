@@ -31,3 +31,11 @@ class DRClassifier(nn.Module):
             nn.Dropout(0.5),   # Dropout prevents overfitting
             nn.Linear(512, num_classes),
         )
+
+        def forward(self, x):
+            return self.backbone(x)
+
+        def get_probabilities(self, x):
+            """Return softmax probabilities (confidence scores for each grade)."""
+            logits = self.forward(x)
+            return torch.softmax(logits, dim=1)
