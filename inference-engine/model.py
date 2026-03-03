@@ -20,3 +20,14 @@ class DRClassifier(nn.Module):
         # This allows the model to adapt its deepest features to retinal images
         for param in self.backbone.layer4.parameters():
             param.requires_grad = True
+
+        # Replace the final classifier
+        # ResNet50's original head: fc(2048 → 1000 ImageNet classes)
+        # Our new head: fc(2048 → 512 → 5 DR grades)
+        in_features = self.backbone.fc.in_features  # 2048
+        self.backbone.fc = nn.Sequential(
+            nn.Linear(in_features, 512),
+            nn.ReLU(),
+            nn.Dropout(0.5),   # Dropout prevents overfitting
+            nn.Linear(512, num_classes),
+        )
