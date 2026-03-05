@@ -43,3 +43,11 @@ class EyePACSDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         return image, label
+    
+ # ── DATA LOADERS ──────────────────────────────────────────────────────────────
+train_ds = EyePACSDataset('data/train.csv', 'data/train/', train_transform)
+val_ds   = EyePACSDataset('data/val.csv',   'data/train/', inference_transform)
+
+# shuffle=True on train so the model doesn't see images in the same order each epoch
+train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=4)
+val_dl   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
