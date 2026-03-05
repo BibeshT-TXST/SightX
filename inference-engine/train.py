@@ -74,3 +74,50 @@ optimizer = torch.optim.Adam(
 
 # Reduce learning rate by 10x every 7 epochs — prevents overshooting the optimal weights
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+
+# ── TRAINING LOOP ─────────────────────────────────────────────────────────────
+os.makedirs('checkpoints', exist_ok=True)   # Ensure checkpoint folder exists
+best_val_acc = 0.0
+
+for epoch in range(EPOCHS):
+    # -- Training --
+    model.train()   # Enables dropout and batch norm training behaviour
+    running_loss, correct = 0, 0
+
+    for images, labels in train_dl:
+        images, labels = images.to(DEVICE), labels.to(DEVICE)
+
+        optimizer.zero_grad()               # Clear gradients from last step
+        outputs = model(images)             # Forward pass
+        loss = criterion(outputs, labels)   # Compute weighted loss
+        loss.backward()                     # Backprop: compute gradients
+        optimizer.step()                    # Update weights using gradients
+
+        running_loss += loss.item() * images.size(0)
+        correct += (outputs.argmax(1) == labels).sum().item()
+
+    train_loss = running_loss / len(train_ds)
+    train_acc  = correct / len(train_ds)
+
+    # -- Validation --
+    model.eval()    # Disables dropout for consistent, deterministic predictions
+    val_correct = 0
+    with torch.no_grad():   # Skip gradient tracking — saves memory and speeds up
+        for images, labels in val_dl:
+            images, labels = images.to(DEVICE), labels.to(DEVICE)
+            outputs = model(images)
+            val_correct += (outputs.argmax(1) == labels).sum().item()
+
+    val_acc = val_correct / len(val_ds)
+    scheduler.step()    # Decay learning rate if step_size epochs have passed
+
+    print(f'Epoch {epoch+1}/{EPOCHS} | Loss: {train_loss:.4f} | '
+          f'Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}')
+
+    # Save checkpoint only when validation accuracy improves
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        torch.save(model.state_dict(), 'checkpoints/best_model.pt')
+        print(f'  ✓ New best model saved (val_acc={val_acc:.4f})')
+
+print(f'\nTraining complete. Best val accuracy: {best_val_acc:.4f}')
