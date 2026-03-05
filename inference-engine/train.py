@@ -8,7 +8,7 @@ import os
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
 from model import DRClassifier
-from preprocessing import train_transform, inference_transform
+from preprocessing import train_transforms, inference_transforms
 
  #── CONFIG ────────────────────────────────────────────────────────────────────
 EPOCHS     = 20
@@ -45,8 +45,8 @@ class EyePACSDataset(Dataset):
         return image, label
     
  # ── DATA LOADERS ──────────────────────────────────────────────────────────────
-train_ds = EyePACSDataset('data/train.csv', 'data/train/', train_transform)
-val_ds   = EyePACSDataset('data/val.csv',   'data/train/', inference_transform)
+train_ds = EyePACSDataset('data/train.csv', 'data/train/', train_transforms)
+val_ds   = EyePACSDataset('data/val.csv',   'data/train/', inference_transforms)
 
 # shuffle=True on train so the model doesn't see images in the same order each epoch
 train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=4)
