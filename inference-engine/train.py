@@ -63,3 +63,14 @@ weights = compute_class_weight('balanced', classes=classes, y=labels)
 # Move weights to same device as model so loss calculation doesn't crash
 class_weights = torch.FloatTensor(weights).to(DEVICE)  
 criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+
+# ── MODEL, OPTIMIZER, SCHEDULER ───────────────────────────────────────────────
+model = DRClassifier(num_classes=5).to(DEVICE)
+
+# filter() ensures we only update trainable params (frozen backbone layers are skipped)
+optimizer = torch.optim.Adam(
+    filter(lambda p: p.requires_grad, model.parameters()), lr=LR
+)
+
+# Reduce learning rate by 10x every 7 epochs — prevents overshooting the optimal weights
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
