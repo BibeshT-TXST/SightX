@@ -48,89 +48,90 @@ class EyePACSDataset(Dataset):
             image = self.transform(image)
         return image, label
     
- # ── TRAIN / VAL SPLIT ─────────────────────────────────────────────────────────
-# trainLabels.csv is the only labels file — split it into train & val sets
-full_df   = pd.read_csv(os.path.join(BASE_DIR, 'data', 'trainLabels.csv'))
-train_df, val_df = train_test_split(full_df, test_size=0.2, random_state=42,
-                                    stratify=full_df['level'])
-train_df.to_csv(os.path.join(BASE_DIR, 'data', 'train_split.csv'), index=False)
-val_df.to_csv(os.path.join(BASE_DIR, 'data', 'val_split.csv'), index=False)
+if __name__ == '__main__':
+    # ── TRAIN / VAL SPLIT ─────────────────────────────────────────────────────
+    # trainLabels.csv is the only labels file — split it into train & val sets
+    full_df   = pd.read_csv(os.path.join(BASE_DIR, 'data', 'trainLabels.csv'))
+    train_df, val_df = train_test_split(full_df, test_size=0.2, random_state=42,
+                                        stratify=full_df['level'])
+    train_df.to_csv(os.path.join(BASE_DIR, 'data', 'train_split.csv'), index=False)
+    val_df.to_csv(os.path.join(BASE_DIR, 'data', 'val_split.csv'), index=False)
 
- # ── DATA LOADERS ──────────────────────────────────────────────────────────────
-img_dir  = os.path.join(BASE_DIR, 'data', 'train')
-train_ds = EyePACSDataset(os.path.join(BASE_DIR, 'data', 'train_split.csv'), img_dir, train_transforms)
-val_ds   = EyePACSDataset(os.path.join(BASE_DIR, 'data', 'val_split.csv'),   img_dir, inference_transforms)
+    # ── DATA LOADERS ──────────────────────────────────────────────────────────
+    img_dir  = os.path.join(BASE_DIR, 'data', 'train')
+    train_ds = EyePACSDataset(os.path.join(BASE_DIR, 'data', 'train_split.csv'), img_dir, train_transforms)
+    val_ds   = EyePACSDataset(os.path.join(BASE_DIR, 'data', 'val_split.csv'),   img_dir, inference_transforms)
 
-# shuffle=True on train so the model doesn't see images in the same order each epoch
-train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=4)
-val_dl   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
+    # shuffle=True on train so the model doesn't see images in the same order each epoch
+    train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=4)
+    val_dl   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
-# ── CLASS IMBALANCE HANDLING ──────────────────────────────────────────────────
-# ~73% of images are Grade 0. Without weighting, the model just predicts
-# Grade 0 for everything and still gets 73% accuracy 
-# To prevent this, we compute class weights and use them in the loss function
-labels  = train_ds.df['level'].values           
-classes = np.unique(labels)
-weights = compute_class_weight('balanced', classes=classes, y=labels)
+    # ── CLASS IMBALANCE HANDLING ──────────────────────────────────────────────
+    # ~73% of images are Grade 0. Without weighting, the model just predicts
+    # Grade 0 for everything and still gets 73% accuracy 
+    # To prevent this, we compute class weights and use them in the loss function
+    labels  = train_ds.df['level'].values           
+    classes = np.unique(labels)
+    weights = compute_class_weight('balanced', classes=classes, y=labels)
 
-# Move weights to same device as model so loss calculation doesn't crash
-class_weights = torch.FloatTensor(weights).to(DEVICE)  
-criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
+    # Move weights to same device as model so loss calculation doesn't crash
+    class_weights = torch.FloatTensor(weights).to(DEVICE)  
+    criterion = torch.nn.CrossEntropyLoss(weight=class_weights)
 
-# ── MODEL, OPTIMIZER, SCHEDULER ───────────────────────────────────────────────
-model = DRClassifier(num_classes=5).to(DEVICE)
+    # ── MODEL, OPTIMIZER, SCHEDULER ───────────────────────────────────────────
+    model = DRClassifier(num_classes=5).to(DEVICE)
 
-# filter() ensures we only update trainable params (frozen backbone layers are skipped)
-optimizer = torch.optim.Adam(
-    filter(lambda p: p.requires_grad, model.parameters()), lr=LR
-)
+    # filter() ensures we only update trainable params (frozen backbone layers are skipped)
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=LR
+    )
 
-# Reduce learning rate by 10x every 7 epochs — prevents overshooting the optimal weights
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+    # Reduce learning rate by 10x every 7 epochs — prevents overshooting the optimal weights
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
-# ── TRAINING LOOP ─────────────────────────────────────────────────────────────
-os.makedirs(os.path.join(BASE_DIR, 'checkpoints'), exist_ok=True)   # Ensure checkpoint folder exists
-best_val_acc = 0.0
+    # ── TRAINING LOOP ─────────────────────────────────────────────────────────
+    os.makedirs(os.path.join(BASE_DIR, 'checkpoints'), exist_ok=True)   # Ensure checkpoint folder exists
+    best_val_acc = 0.0
 
-for epoch in range(EPOCHS):
-    # -- Training --
-    model.train()   # Enables dropout and batch norm training behaviour
-    running_loss, correct = 0, 0
+    for epoch in range(EPOCHS):
+        # -- Training --
+        model.train()   # Enables dropout and batch norm training behaviour
+        running_loss, correct = 0, 0
 
-    for images, labels in train_dl:
-        images, labels = images.to(DEVICE), labels.to(DEVICE)
-
-        optimizer.zero_grad()               # Clear gradients from last step
-        outputs = model(images)             # Forward pass
-        loss = criterion(outputs, labels)   # Compute weighted loss
-        loss.backward()                     # Backprop: compute gradients
-        optimizer.step()                    # Update weights using gradients
-
-        running_loss += loss.item() * images.size(0)
-        correct += (outputs.argmax(1) == labels).sum().item()
-
-    train_loss = running_loss / len(train_ds)
-    train_acc  = correct / len(train_ds)
-
-    # -- Validation --
-    model.eval()    # Disables dropout for consistent, deterministic predictions
-    val_correct = 0
-    with torch.no_grad():   # Skip gradient tracking — saves memory and speeds up
-        for images, labels in val_dl:
+        for images, labels in train_dl:
             images, labels = images.to(DEVICE), labels.to(DEVICE)
-            outputs = model(images)
-            val_correct += (outputs.argmax(1) == labels).sum().item()
 
-    val_acc = val_correct / len(val_ds)
-    scheduler.step()    # Decay learning rate if step_size epochs have passed
+            optimizer.zero_grad()               # Clear gradients from last step
+            outputs = model(images)             # Forward pass
+            loss = criterion(outputs, labels)   # Compute weighted loss
+            loss.backward()                     # Backprop: compute gradients
+            optimizer.step()                    # Update weights using gradients
 
-    print(f'Epoch {epoch+1}/{EPOCHS} | Loss: {train_loss:.4f} | '
-          f'Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}')
+            running_loss += loss.item() * images.size(0)
+            correct += (outputs.argmax(1) == labels).sum().item()
 
-    # Save checkpoint only when validation accuracy improves
-    if val_acc > best_val_acc:
-        best_val_acc = val_acc
-        torch.save(model.state_dict(), os.path.join(BASE_DIR, 'checkpoints', 'best_model.pt'))
-        print(f'  ✓ New best model saved (val_acc={val_acc:.4f})')
+        train_loss = running_loss / len(train_ds)
+        train_acc  = correct / len(train_ds)
 
-print(f'\nTraining complete. Best val accuracy: {best_val_acc:.4f}')
+        # -- Validation --
+        model.eval()    # Disables dropout for consistent, deterministic predictions
+        val_correct = 0
+        with torch.no_grad():   # Skip gradient tracking — saves memory and speeds up
+            for images, labels in val_dl:
+                images, labels = images.to(DEVICE), labels.to(DEVICE)
+                outputs = model(images)
+                val_correct += (outputs.argmax(1) == labels).sum().item()
+
+        val_acc = val_correct / len(val_ds)
+        scheduler.step()    # Decay learning rate if step_size epochs have passed
+
+        print(f'Epoch {epoch+1}/{EPOCHS} | Loss: {train_loss:.4f} | '
+              f'Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f}')
+
+        # Save checkpoint only when validation accuracy improves
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            torch.save(model.state_dict(), os.path.join(BASE_DIR, 'checkpoints', 'best_model.pt'))
+            print(f'  ✓ New best model saved (val_acc={val_acc:.4f})')
+
+    print(f'\nTraining complete. Best val accuracy: {best_val_acc:.4f}')
