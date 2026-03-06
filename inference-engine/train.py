@@ -6,6 +6,10 @@ from PIL import Image
 import pandas as pd
 import os
 import numpy as np
+from sklearn.model_selection import train_test_split
+
+# Anchor all paths to the directory where this script lives
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 from sklearn.utils.class_weight import compute_class_weight
 from model import DRClassifier
 from preprocessing import train_transforms, inference_transforms
@@ -44,9 +48,18 @@ class EyePACSDataset(Dataset):
             image = self.transform(image)
         return image, label
     
+ # ── TRAIN / VAL SPLIT ─────────────────────────────────────────────────────────
+# trainLabels.csv is the only labels file — split it into train & val sets
+full_df   = pd.read_csv(os.path.join(BASE_DIR, 'data', 'trainLabels.csv'))
+train_df, val_df = train_test_split(full_df, test_size=0.2, random_state=42,
+                                    stratify=full_df['level'])
+train_df.to_csv(os.path.join(BASE_DIR, 'data', 'train_split.csv'), index=False)
+val_df.to_csv(os.path.join(BASE_DIR, 'data', 'val_split.csv'), index=False)
+
  # ── DATA LOADERS ──────────────────────────────────────────────────────────────
-train_ds = EyePACSDataset('data/train.csv', 'data/train/', train_transforms)
-val_ds   = EyePACSDataset('data/val.csv',   'data/train/', inference_transforms)
+img_dir  = os.path.join(BASE_DIR, 'data', 'train')
+train_ds = EyePACSDataset(os.path.join(BASE_DIR, 'data', 'train_split.csv'), img_dir, train_transforms)
+val_ds   = EyePACSDataset(os.path.join(BASE_DIR, 'data', 'val_split.csv'),   img_dir, inference_transforms)
 
 # shuffle=True on train so the model doesn't see images in the same order each epoch
 train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=4)
@@ -76,7 +89,7 @@ optimizer = torch.optim.Adam(
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 # ── TRAINING LOOP ─────────────────────────────────────────────────────────────
-os.makedirs('checkpoints', exist_ok=True)   # Ensure checkpoint folder exists
+os.makedirs(os.path.join(BASE_DIR, 'checkpoints'), exist_ok=True)   # Ensure checkpoint folder exists
 best_val_acc = 0.0
 
 for epoch in range(EPOCHS):
@@ -117,7 +130,7 @@ for epoch in range(EPOCHS):
     # Save checkpoint only when validation accuracy improves
     if val_acc > best_val_acc:
         best_val_acc = val_acc
-        torch.save(model.state_dict(), 'checkpoints/best_model.pt')
+        torch.save(model.state_dict(), os.path.join(BASE_DIR, 'checkpoints', 'best_model.pt'))
         print(f'  ✓ New best model saved (val_acc={val_acc:.4f})')
 
 print(f'\nTraining complete. Best val accuracy: {best_val_acc:.4f}')
