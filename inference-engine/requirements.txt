@@ -1,1 +1,9 @@
 # Dependencies for the inference-engine project
+torch
+torchvision
+Pillow
+pandas
+numpy
+scikit-learn
+opencv-python-headless
+matplotlib
