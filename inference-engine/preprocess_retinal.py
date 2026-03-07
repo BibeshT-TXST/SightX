@@ -18,8 +18,9 @@ import cv2
 import numpy as np
 import os
 import argparse
-from multiprocessing import Pool, cpu_count
-from functools import partial
+
+# Limit OpenCV's internal threads to prevent CPU overload
+cv2.setNumThreads(2)
 
 # Anchor all paths to the directory where this script lives
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -246,8 +247,6 @@ def main():
                         help='Process only N images (for testing)')
     parser.add_argument('--target-radius', type=int, default=300,
                         help='Target retinal radius in pixels (default: 300)')
-    parser.add_argument('--workers', type=int, default=None,
-                        help='Number of parallel workers (default: CPU count - 1)')
     args = parser.parse_args()
     
     raw_dir = os.path.join(BASE_DIR, 'data', 'train')
@@ -256,41 +255,45 @@ def main():
     
     # Get list of images to process
     all_files = [f for f in os.listdir(raw_dir) if f.endswith('.jpeg')]
-    all_files.sort()  # Deterministic order
+    all_files.sort()
     
     if args.sample:
         all_files = all_files[:args.sample]
     
+    # Skip already-processed images (resume support)
+    existing = set(os.listdir(out_dir))
+    to_process = [f for f in all_files 
+                  if os.path.splitext(f)[0] + '.jpeg' not in existing]
+    
     total = len(all_files)
-    print(f"Preprocessing {total} images...")
+    skipped = total - len(to_process)
+    
+    print(f"Preprocessing {total} images ({skipped} already done, {len(to_process)} remaining)...")
     print(f"  Source:        {raw_dir}")
     print(f"  Destination:   {out_dir}")
     print(f"  Target radius: {args.target_radius}px")
     print()
     
-    # Use multiprocessing for speed
-    num_workers = args.workers or 2  # Default to 2 workers to keep CPU ~30-40%
-    process_fn = partial(preprocess_single_image,
-                         raw_dir=raw_dir,
-                         out_dir=out_dir,
-                         target_radius=args.target_radius)
-    
-    successes = 0
+    # Simple sequential loop — safe CPU usage (~20-30%)
+    successes = skipped
     failures = 0
     
-    with Pool(num_workers) as pool:
-        for i, (filename, success, error) in enumerate(pool.imap_unordered(process_fn, all_files)):
-            if success:
-                successes += 1
-            else:
-                failures += 1
-                print(f"  ✗ Failed: {filename} — {error}")
-            
-            # Progress update every 500 images
-            if (i + 1) % 500 == 0 or (i + 1) == total:
-                pct = (i + 1) / total * 100
-                print(f"  [{i+1}/{total}] {pct:.1f}% complete "
-                      f"({successes} ok, {failures} failed)")
+    for i, filename in enumerate(to_process):
+        fname, success, error = preprocess_single_image(
+            filename, raw_dir, out_dir, args.target_radius)
+        
+        if success:
+            successes += 1
+        else:
+            failures += 1
+            print(f"  ✗ Failed: {fname} — {error}")
+        
+        # Progress update every 500 images
+        done = skipped + i + 1
+        if (i + 1) % 500 == 0 or (i + 1) == len(to_process):
+            pct = done / total * 100
+            print(f"  [{done}/{total}] {pct:.1f}% complete "
+                  f"({successes} ok, {failures} failed)")
     
     print(f"\nDone! {successes}/{total} images preprocessed successfully.")
     if failures > 0:
