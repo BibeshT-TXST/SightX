@@ -202,6 +202,18 @@ def preprocess_single_image(filename, raw_dir, out_dir, target_radius):
         if img is None:
             return (filename, False, "Failed to load image")
         
+        # Step 0: FAST DOWNSCALE — shrink the image before any expensive ops
+        # Raw images are 2560-4752px. Processing at full resolution is 
+        # extremely slow (huge Gaussian kernels, contour detection on millions
+        # of pixels). Since our target is ~600px, we downscale to ~1000px 
+        # first. This makes all subsequent steps ~20× faster.
+        h, w = img.shape[:2]
+        max_dim = 1024
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            img = cv2.resize(img, (int(w * scale), int(h * scale)),
+                             interpolation=cv2.INTER_AREA)
+        
         # Step 1: Circle crop — remove black borders, isolate the retina
         img, _ = circle_crop(img)
         
@@ -217,10 +229,10 @@ def preprocess_single_image(filename, raw_dir, out_dir, target_radius):
         # Step 5: Clip to 90% to remove boundary artifacts
         img = clip_to_percentage(img, percentage=0.90)
         
-        # Save as PNG (lossless) to avoid further JPEG compression artifacts
-        out_name = os.path.splitext(filename)[0] + '.png'
+        # Save as JPEG (quality 95) — faster than PNG, negligible quality loss
+        out_name = os.path.splitext(filename)[0] + '.jpeg'
         out_path = os.path.join(out_dir, out_name)
-        cv2.imwrite(out_path, img)
+        cv2.imwrite(out_path, img, [cv2.IMWRITE_JPEG_QUALITY, 95])
         
         return (filename, True, None)
     
@@ -257,7 +269,7 @@ def main():
     print()
     
     # Use multiprocessing for speed
-    num_workers = args.workers or max(1, cpu_count() - 1)
+    num_workers = args.workers or 2  # Default to 2 workers to keep CPU ~30-40%
     process_fn = partial(preprocess_single_image,
                          raw_dir=raw_dir,
                          out_dir=out_dir,

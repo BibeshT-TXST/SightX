@@ -71,7 +71,7 @@ class EyePACSDataset(Dataset):
         
         # Prefer preprocessed images if available
         if self.preprocessed_dir:
-            img_path = os.path.join(self.preprocessed_dir, image_name + '.png')
+            img_path = os.path.join(self.preprocessed_dir, image_name + '.jpeg')
             if os.path.exists(img_path):
                 image = Image.open(img_path).convert('RGB')
                 if self.transform:
