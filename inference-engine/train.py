@@ -160,7 +160,7 @@ if __name__ == '__main__':
     # Use preprocessed images if available and not explicitly disabled
     use_processed = os.path.isdir(processed_dir) and not args.no_preprocessed
     if use_processed:
-        n_processed = len([f for f in os.listdir(processed_dir) if f.endswith('.png')])
+        n_processed = len([f for f in os.listdir(processed_dir) if f.endswith('.jpeg')])
         print(f"Using preprocessed images ({n_processed} found in data/train_processed/)")
     else:
         print("Using raw images (run preprocess_retinal.py first for better results)")
