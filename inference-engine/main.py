@@ -30,7 +30,7 @@ from PIL import Image
 
 # Local project modules
 from model import DRClassifier
-from preprocessing import preprocess_image
+from preprocessing import inference_transforms
 
 
 # ── FastAPI Application Instance ─────────────────────────────────────────────
@@ -129,7 +129,9 @@ async def predict(file: UploadFile = File(...)):
     # Apply the deterministic inference transforms defined in
     # preprocessing.py (resize → center-crop → normalize).  The output
     # is a float32 tensor of shape [1, 3, 384, 384] ready for the model.
-    tensor = preprocess_image(image).to(DEVICE)
+    # We use inference_transforms directly on the PIL image (not
+    # preprocess_image, which expects a file path string).
+    tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
 
     # ── 4. Run inference (no gradient computation) ───────────────────────
     # `torch.no_grad()` disables the autograd engine, which:
