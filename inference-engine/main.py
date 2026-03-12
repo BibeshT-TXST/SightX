@@ -30,7 +30,7 @@ from PIL import Image
 
 # Local project modules
 from model import DRClassifier
-from preprocessing import inference_transforms
+from preprocessing import preprocess_image
 
 
 # ── FastAPI Application Instance ─────────────────────────────────────────────
@@ -40,7 +40,7 @@ app = FastAPI(title='SightX Inference Engine', version='1.0')
 # ── Startup: Load Model Once Into Memory ─────────────────────────────────────
 # Selecting the best available hardware accelerator:
 #   • Apple Silicon → 'mps'  (Metal Performance Shaders)
-#   • Otherwise     → 'cpu'
+#   • Otherwise     → 'gpu'  (CUDA) if available, else 'cpu'
 # Note: CUDA is not listed here because the target deployment environment
 # is an Apple-silicon Mac.  Add a CUDA check if deploying to a GPU server.
 DEVICE = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -52,8 +52,7 @@ model = DRClassifier(num_classes=5)
 # `map_location` ensures weights are mapped to the current device even if
 # the checkpoint was saved on a different one (e.g., trained on MPS but
 # deployed on CPU).
-model.load_state_dict(torch.load('checkpoints/best_model.pt',
-                                 map_location=DEVICE))
+model.load_state_dict(torch.load('checkpoints/best_model.pt',map_location=DEVICE))
 
 # Switch to evaluation mode:
 #   • Disables dropout (all neurons active → deterministic output)
@@ -129,9 +128,7 @@ async def predict(file: UploadFile = File(...)):
     # Apply the deterministic inference transforms defined in
     # preprocessing.py (resize → center-crop → normalize).  The output
     # is a float32 tensor of shape [1, 3, 384, 384] ready for the model.
-    # We use inference_transforms directly on the PIL image (not
-    # preprocess_image, which expects a file path string).
-    tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
+    tensor = preprocess_image(image).to(DEVICE)
 
     # ── 4. Run inference (no gradient computation) ───────────────────────
     # `torch.no_grad()` disables the autograd engine, which:
