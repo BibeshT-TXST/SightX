@@ -29,10 +29,12 @@ DEVICE = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 SAMPLES_PER_GRADE = 250
 GRADES_TO_TEST = [1, 2, 3, 4]
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Load original labels to find a balanced subset
-val_csv = 'data/val_split.csv'
+val_csv = os.path.join(BASE_DIR, 'data', 'val_split.csv')
 if not os.path.exists(val_csv):
-    val_csv = 'data/trainLabels.csv'  # Fallback
+    val_csv = os.path.join(BASE_DIR, 'data', 'trainLabels.csv')  # Fallback
 
 df = pd.read_csv(val_csv)
 
@@ -46,7 +48,7 @@ print(f"Total test images: {len(test_images)}")
 
 # Load model
 model = DRClassifier(num_classes=5).to(DEVICE)
-model.load_state_dict(torch.load('checkpoints/best_model.pt', map_location=DEVICE))
+model.load_state_dict(torch.load(os.path.join(BASE_DIR, 'checkpoints', 'best_model.pt'), map_location=DEVICE))
 model.eval()
 
 # Metrics tracking
@@ -67,7 +69,7 @@ with torch.no_grad():
         if i % 100 == 0:
             print(f"  Processed {i}/{len(test_images)}")
             
-        img_path = os.path.join('data', 'train', f"{img_name}.jpeg")
+        img_path = os.path.join(BASE_DIR, 'data', 'train', f"{img_name}.jpeg")
         if not os.path.exists(img_path):
             continue
             
