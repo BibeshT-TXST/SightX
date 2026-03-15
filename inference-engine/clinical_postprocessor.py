@@ -162,7 +162,7 @@ def risk_minimized_decision(tier_probs: np.ndarray,
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Default temperature — replace with the value found by calibrate_temperature.py
-OPTIMAL_TEMPERATURE = 1.5
+OPTIMAL_TEMPERATURE = 0.4232
 
 # Lazy import to avoid hard dependency at module level
 _apply_temperature = None

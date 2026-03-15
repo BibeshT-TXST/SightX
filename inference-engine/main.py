@@ -30,7 +30,8 @@ from PIL import Image
 
 # Local project modules
 from model import DRClassifier
-from preprocessing import preprocess_image
+from preprocessing import inference_transforms
+from clinical_postprocessor import classify_clinical_tier
 
 
 # ── FastAPI Application Instance ─────────────────────────────────────────────
@@ -126,9 +127,8 @@ async def predict(file: UploadFile = File(...)):
 
     # ── 3. Preprocess the image ──────────────────────────────────────────
     # Apply the deterministic inference transforms defined in
-    # preprocessing.py (resize → center-crop → normalize).  The output
     # is a float32 tensor of shape [1, 3, 384, 384] ready for the model.
-    tensor = preprocess_image(image).to(DEVICE)
+    tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
 
     # ── 4. Run inference (no gradient computation) ───────────────────────
     # `torch.no_grad()` disables the autograd engine, which:
@@ -136,23 +136,42 @@ async def predict(file: UploadFile = File(...)):
     #   • Speeds up the forward pass slightly
     # This is safe because we never call .backward() during inference.
     with torch.no_grad():
-        outputs = model(tensor)
+        logits = model(tensor)
+        logits_np = logits.cpu().numpy().flatten()
 
-        # Apply softmax to convert raw logits into a probability
-        # distribution over the 5 grades.  The probabilities sum to 1.
-        probs = torch.softmax(outputs, dim=1)
+    # ── 5. Apply Post-Processing Pipeline ────────────────────────────────
+    # Run the raw logits through temperature calibration, Bayesian prior
+    # correction, and risk-minimized tier aggregation.
+    result = classify_clinical_tier(logits_np, prior_mode='clinical')
 
-        # The predicted grade is the class with the highest probability.
-        confidence, predicted = torch.max(probs, 1)
-
-    # ── 5. Calculate inference latency ───────────────────────────────────
+    # ── 6. Calculate inference latency ───────────────────────────────────
     elapsed_ms = (time.time() - start_time) * 1000
 
-    # ── 6. Build and return the JSON response ────────────────────────────
-    # `.item()` converts single-element tensors to plain Python scalars,
-    # which are JSON-serializable.
+    # ── 7. Build and return the JSON response ────────────────────────────
     return JSONResponse({
-        'grade': GRADE_LABELS[predicted.item()],
-        'confidence': round(confidence.item(), 4),
+        # Clinical tier decisions
+        'tier': result['tier_label'],
+        'tier_emoji': result['tier_emoji'],
+        'action': result['action'],
+        'confidence': result['confidence'],
+        
+        # Detailed probability breakdown
+        'tier_probabilities': {
+            'no_disease': result['tier_probs'][0],
+            'recommended': result['tier_probs'][1],
+            'required': result['tier_probs'][2],
+        },
+        'expected_costs': {
+            'no_disease': result['expected_costs'][0],
+            'recommended': result['expected_costs'][1],
+            'required': result['expected_costs'][2],
+        },
+        'grade_probabilities': {
+            f'grade_{i}': p for i, p in enumerate(result['grade_probs'])
+        },
+        
+        # Backward compatibility
+        'raw_model_grade': result['raw_grade'],
+        'raw_model_grade_label': GRADE_LABELS[result['raw_grade']],
         'inference_time_ms': round(elapsed_ms, 2)
     })
