@@ -1,5 +1,8 @@
 # Ignore the massive dataset
-inference-engine/data/
+data/
+
+# Ignore trained model checkpoints
+checkpoints/
 
 # Ignore Python cache and environment
 __pycache__/
@@ -7,4 +10,4 @@ __pycache__/
 venv/
 
 # Ignore OS-specific files
-.DS_Store
+.DS_Store 
