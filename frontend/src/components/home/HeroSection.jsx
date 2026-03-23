@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Box, Typography, Button, Container, Grid, Chip } from '@mui/material';
 import { School, Lock, Analytics } from '@mui/icons-material';
 import logo from '../../assets/logo.png';
@@ -51,8 +52,8 @@ const HeroSection = () => {
               <Button
                 variant="contained"
                 color="primary"
-                href=""
-                target="_blank"
+                component={Link}
+                to="/login"
                 sx={{ fontSize: '1.125rem' }}
               >
                 Resident Login

@@ -1,21 +1,23 @@
 import { createTheme } from '@mui/material/styles';
 
 const customColors = {
-  surface: '#ffffff',
+  surface: '#f7f9ff',
   surfaceContainerLowest: '#ffffff',
-  surfaceContainerLow: '#fafafa',
-  surfaceContainer: '#f5f5f5',
-  surfaceContainerHigh: '#efefef',
-  surfaceContainerHighest: '#e8e8e8',
+  surfaceContainerLow: '#f0f4fc',
+  surfaceContainer: '#eaeef6',
+  surfaceContainerHigh: '#e4e8f0',
+  surfaceContainerHighest: '#dee3eb',
   onSurface: '#171c22',
   onSurfaceVariant: '#414755',
+  outline: '#727786',
   outlineVariant: '#c1c6d7',
   primaryContainer: '#006ff0',
   tertiaryContainer: '#008378',
   onTertiaryContainer: '#f4fffc',
   errorContainer: '#ffdad6',
-  surfaceDim: '#e0e0e0',
-  surfaceTint: '#005ac5'
+  surfaceDim: '#d6dae2',
+  surfaceTint: '#005ac5',
+  background: '#f7f9ff',
 };
 
 const theme = createTheme({

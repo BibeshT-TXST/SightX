@@ -41,7 +41,7 @@ const BentoGrid = () => {
                 </Typography>
 
                 <Typography variant="body1" sx={{ color: 'text.secondary', fontSize: '1rem', lineHeight: 1.75, maxWidth: 560 }}>
-                  Deep learning architectures process raw retinal scans to surface early-stage markers, enabling clinicians to triage and prioritize high-risk patients before specialist review.
+                  Deep learning architectures process raw retinal scans to surface early stage markers, enabling clinicians to triage and prioritize high risk patients before specialist review.
                 </Typography>
               </Box>
             </Paper>
