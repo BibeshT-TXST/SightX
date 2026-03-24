@@ -5,6 +5,11 @@ import HeroSection from './components/home/HeroSection';
 import BentoGrid from './components/home/BentoGrid';
 import Footer from './components/layout/Footer';
 import LoginPage from './pages/LoginPage';
+import RetinalScanPage from './pages/RetinalScanPage';
+import AccountsPage from './pages/AccountsPage';
+import LegalsPage from './pages/LegalsPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import { AuthProvider } from './context/AuthContext';
 
 function LandingPage() {
   return (
@@ -21,12 +26,19 @@ function LandingPage() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<RetinalScanPage />} />
+            <Route path="/dashboard/accounts" element={<AccountsPage />} />
+            <Route path="/dashboard/legals" element={<LegalsPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

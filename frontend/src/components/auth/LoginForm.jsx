@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -12,12 +13,15 @@ import {
   IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginForm({ darkMode = false }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [step, setStep] = useState(1); // 1 = email, 2 = password
   const [isScanning, setIsScanning] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleContinue = (e) => {
     e.preventDefault();
@@ -29,10 +33,11 @@ export default function LoginForm({ darkMode = false }) {
   const handleLogin = (e) => {
     e.preventDefault();
     setIsScanning(true);
-    // Simulate scanning animation, then log
+    // Simulate scanning animation, then navigate to dashboard
     setTimeout(() => {
       setIsScanning(false);
-      console.log('Login submitted', { email, password });
+      login();
+      navigate('/dashboard');
     }, 2400);
   };
 
