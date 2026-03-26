@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function AdminCreateUserPage() {
     const { logout } = useAuth();
+    const navigate = useNavigate();
     // Added role and clinicalUnit to our state
     const [formData, setFormData] = useState({
         email: '', password: '', firstName: '', lastName: '',
@@ -35,8 +37,9 @@ export default function AdminCreateUserPage() {
         }
 
         setStatusMsg('Success! User Created. You are being logged out so they can log in.');
-        setTimeout(() => {
-            logout();
+        setTimeout(async () => {
+            await logout();
+            navigate('/');
         }, 2500);
     };
 
