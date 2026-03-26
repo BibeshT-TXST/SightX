@@ -221,16 +221,27 @@ export default function RetinalScanPage() {
                   sx={{
                     px: 1.5,
                     py: 0.5,
-                    bgcolor: '#008378',
+                    bgcolor: isProcessing ? '#0057c0' : '#008378',
                     color: '#f4fffc',
                     fontSize: '0.625rem',
                     fontWeight: 900,
                     textTransform: 'uppercase',
                     letterSpacing: '0.12em',
                     borderRadius: '1.5rem',
+                    '@keyframes pulse-ready': {
+                      '0%': { boxShadow: '0 0 0 0 rgba(0,131,120, 0.4)' },
+                      '70%': { boxShadow: '0 0 0 6px rgba(0,131,120, 0)' },
+                      '100%': { boxShadow: '0 0 0 0 rgba(0,131,120, 0)' },
+                    },
+                    '@keyframes pulse-processing': {
+                      '0%': { boxShadow: '0 0 0 0 rgba(0,87,192, 0.4)' },
+                      '70%': { boxShadow: '0 0 0 6px rgba(0,87,192, 0)' },
+                      '100%': { boxShadow: '0 0 0 0 rgba(0,87,192, 0)' },
+                    },
+                    animation: isProcessing ? 'pulse-processing 1.5s infinite' : 'pulse-ready 2s infinite',
                   }}
                 >
-                  System Ready
+                  {isProcessing ? 'Processing 108x...' : 'System Ready'}
                 </Box>
               </Box>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.3, mb: 1 }}>

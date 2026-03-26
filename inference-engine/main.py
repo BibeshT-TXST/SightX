@@ -130,48 +130,61 @@ async def predict(file: UploadFile = File(...)):
     # is a float32 tensor of shape [1, 3, 384, 384] ready for the model.
     tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
 
-    # ── 4. Run inference (no gradient computation) ───────────────────────
-    # `torch.no_grad()` disables the autograd engine, which:
-    #   • Reduces memory usage (no computation graph stored)
-    #   • Speeds up the forward pass slightly
-    # This is safe because we never call .backward() during inference.
+    # ── 4. Run inference 108 times (no gradient computation) ─────────────
+    from collections import Counter
+    
+    total_time_ms = 0
+    all_raw_grades = []
+    all_confidences = []
+    final_result = None
+
+    # `torch.no_grad()` disables the autograd engine to reduce memory and speed up forward passes.
     with torch.no_grad():
-        logits = model(tensor)
-        logits_np = logits.cpu().numpy().flatten()
+        for _ in range(108):
+            iter_start = time.time()
+            
+            logits = model(tensor)
+            logits_np = logits.cpu().numpy().flatten()
+            
+            result = classify_clinical_tier(logits_np, prior_mode='clinical')
+            
+            iter_end = time.time()
+            total_time_ms += (iter_end - iter_start) * 1000
+            
+            all_raw_grades.append(result['raw_grade'])
+            all_confidences.append(result['confidence'])
+            final_result = result # Keep the last one for detailed probs
 
-    # ── 5. Apply Post-Processing Pipeline ────────────────────────────────
-    # Run the raw logits through temperature calibration, Bayesian prior
-    # correction, and risk-minimized tier aggregation.
-    result = classify_clinical_tier(logits_np, prior_mode='clinical')
+    # ── 5. Calculate Ensembled Metrics ───────────────────────────────────
+    avg_inference_time_ms = total_time_ms / 108.0
+    mode_raw_grade = Counter(all_raw_grades).most_common(1)[0][0]
+    avg_confidence = sum(all_confidences) / len(all_confidences)
 
-    # ── 6. Calculate inference latency ───────────────────────────────────
-    elapsed_ms = (time.time() - start_time) * 1000
-
-    # ── 7. Build and return the JSON response ────────────────────────────
+    # ── 6. Build and return the JSON response ────────────────────────────
     return JSONResponse({
-        # Clinical tier decisions
-        'tier': result['tier_label'],
-        'tier_emoji': result['tier_emoji'],
-        'action': result['action'],
-        'confidence': result['confidence'],
+        # Clinical tier decisions (using last result's tier logic for now)
+        'tier': final_result['tier_label'],
+        'tier_emoji': final_result['tier_emoji'],
+        'action': final_result['action'],
+        'confidence': avg_confidence,
         
         # Detailed probability breakdown
         'tier_probabilities': {
-            'no_disease': result['tier_probs'][0],
-            'recommended': result['tier_probs'][1],
-            'required': result['tier_probs'][2],
+            'no_disease': final_result['tier_probs'][0],
+            'recommended': final_result['tier_probs'][1],
+            'required': final_result['tier_probs'][2],
         },
         'expected_costs': {
-            'no_disease': result['expected_costs'][0],
-            'recommended': result['expected_costs'][1],
-            'required': result['expected_costs'][2],
+            'no_disease': final_result['expected_costs'][0],
+            'recommended': final_result['expected_costs'][1],
+            'required': final_result['expected_costs'][2],
         },
         'grade_probabilities': {
-            f'grade_{i}': p for i, p in enumerate(result['grade_probs'])
+            f'grade_{i}': p for i, p in enumerate(final_result['grade_probs'])
         },
         
-        # Backward compatibility
-        'raw_model_grade': result['raw_grade'],
-        'raw_model_grade_label': GRADE_LABELS[result['raw_grade']],
-        'inference_time_ms': round(elapsed_ms, 2)
+        # Monte-carlo ensemble metrics
+        'raw_model_grade': mode_raw_grade,
+        'raw_model_grade_label': GRADE_LABELS[mode_raw_grade],
+        'inference_time_ms': round(avg_inference_time_ms, 2)
     })
