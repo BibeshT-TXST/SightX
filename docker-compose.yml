@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     image: sightx-frontend:latest
@@ -7,11 +5,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
     ports:
       - "80:80"
-    # Note: Frontend environment variables (e.g., VITE_SUPABASE_URL) need to be present
-    # at build time. They are picked up from `./frontend/.env` via the COPY command
-    # in the Dockerfile during the Vite build stage.
     restart: unless-stopped
     depends_on:
       - backend
@@ -25,11 +23,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
-    # Load Supabase keys and other environment variables securely at runtime
     env_file:
-      - ./backend/.env
+      - .env
     environment:
-      # Allows the backend to securely communicate with the inference engine internally
       - INFERENCE_ENGINE_URL=http://inference-engine:8000
     restart: unless-stopped
 
@@ -41,7 +37,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    # In case there are environment variables needed for the inference engine
     env_file:
-      - ./inference-engine/.env
+      - .env
     restart: unless-stopped
