@@ -12,15 +12,14 @@ export default function RetinalScanPage() {
   const [scanResult, setScanResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef(null);
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  const processFile = async (file) => {
     if (!file) return;
     setIsProcessing(true);
     const formData = new FormData();
     formData.append('image', file);
     try {
       // Send to our Node.js Backend API
-      const response = await fetch('http://localhost:5000/api/scan/upload', {
+      const response = await fetch('http://localhost:5001/api/scan/upload', {
         method: 'POST',
         body: formData,
       });
@@ -30,6 +29,23 @@ export default function RetinalScanPage() {
       console.error('Upload failed:', error);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    processFile(event.target.files[0]);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    if (isProcessing) return;
+    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+      processFile(event.dataTransfer.files[0]);
+      event.dataTransfer.clearData();
     }
   };
 
@@ -98,6 +114,8 @@ export default function RetinalScanPage() {
           {/* Upload Zone */}
           <Box
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
             sx={{
               position: 'relative',
               height: 480,
