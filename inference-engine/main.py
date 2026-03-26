@@ -30,7 +30,7 @@ from PIL import Image
 
 # Local project modules
 from model import DRClassifier
-from preprocessing import inference_transforms
+from preprocessing import inference_transforms, tta_transforms
 from clinical_postprocessor import classify_clinical_tier
 
 
@@ -125,12 +125,10 @@ async def predict(file: UploadFile = File(...)):
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert('RGB')
 
-    # ── 3. Preprocess the image ──────────────────────────────────────────
-    # Apply the deterministic inference transforms defined in
-    # is a float32 tensor of shape [1, 3, 384, 384] ready for the model.
-    tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
+    # ── 3. Base Image Loaded ─────────────────────────────────────────────
+    # We will apply transforms uniquely inside the 108 loop for Test-Time Augmentation.
 
-    # ── 4. Run inference 108 times (no gradient computation) ─────────────
+    # ── 4. Run TTA inference 108 times (no gradient computation) ─────────────
     from collections import Counter
     
     total_time_ms = 0
@@ -140,8 +138,15 @@ async def predict(file: UploadFile = File(...)):
 
     # `torch.no_grad()` disables the autograd engine to reduce memory and speed up forward passes.
     with torch.no_grad():
-        for _ in range(108):
+        for i in range(108):
             iter_start = time.time()
+            
+            # Use deterministic transform for the very first pass to anchor the main result,
+            # use TTA for the other 107 passes to build the ensemble distribution.
+            if i == 0:
+                tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
+            else:
+                tensor = tta_transforms(image).unsqueeze(0).to(DEVICE)
             
             logits = model(tensor)
             logits_np = logits.cpu().numpy().flatten()

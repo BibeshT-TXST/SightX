@@ -241,7 +241,7 @@ export default function RetinalScanPage() {
                     animation: isProcessing ? 'pulse-processing 1.5s infinite' : 'pulse-ready 2s infinite',
                   }}
                 >
-                  {isProcessing ? 'Processing 108x...' : 'System Ready'}
+                  {isProcessing ? 'Processing Image' : 'System Ready'}
                 </Box>
               </Box>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.3, mb: 1 }}>
