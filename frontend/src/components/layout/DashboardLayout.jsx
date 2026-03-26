@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }) {
 
   const handleSignOut = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
