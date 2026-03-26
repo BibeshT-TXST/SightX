@@ -97,6 +97,7 @@ export default function RetinalScanPage() {
         >
           {/* Upload Zone */}
           <Box
+            onClick={() => fileInputRef.current?.click()}
             sx={{
               position: 'relative',
               height: 480,
@@ -110,13 +111,21 @@ export default function RetinalScanPage() {
               justifyContent: 'center',
               overflow: 'hidden',
               transition: 'all 0.3s',
-              cursor: 'pointer',
+              cursor: isProcessing ? 'default' : 'pointer',
+              pointerEvents: isProcessing ? 'none' : 'auto',
               '&:hover': {
                 borderColor: 'rgba(0,87,192,0.4)',
                 bgcolor: 'rgba(0,87,192,0.03)',
               },
             }}
           >
+            <input 
+              type="file" 
+              accept="image/jpeg, image/png" 
+              style={{ display: 'none' }} 
+              ref={fileInputRef} 
+              onChange={handleFileUpload}
+            />
             {/* Radial glow */}
             <Box
               sx={{
@@ -147,7 +156,7 @@ export default function RetinalScanPage() {
                 <CloudUploadIcon sx={{ fontSize: 40, color: '#0057c0' }} />
               </Box>
               <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: '#171c22', mb: 0.5 }}>
-                Upload Fundus Image
+                {isProcessing ? 'Processing Scan...' : 'Upload Fundus Image'}
               </Typography>
               <Typography sx={{ color: '#414755', fontSize: '0.875rem', mb: 3 }}>
                 Drag and drop high resolution clinical exports
