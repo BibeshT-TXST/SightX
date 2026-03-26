@@ -6,22 +6,42 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   // We now store a "session" object instead of just true/false
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. On first load, check if the user is already logged in
+
+    // Helper function to fetch the profile row when a session starts
+    const fetchProfile = async (currentSession) => {
+      if (!currentSession) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentSession.user.id)
+        .single();
+
+      setProfile(data);
+      setLoading(false);
+    };
+
+    // 1. Initial Load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false);
+      fetchProfile(session); // Fetch their role before finishing the loading state!
     });
 
-    // 2. Listen continuously for login/logout events
+    // 2. Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      fetchProfile(session);
     });
 
-    // Cleanup the listener when the app closes
     return () => subscription.unsubscribe();
+
   }, []);
 
   // Tell Supabase to authenticate this email & password
@@ -39,8 +59,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!session;
 
   return (
-    <AuthContext.Provider value={{ session, isAuthenticated, login, logout, loading }}>
-      {/* Wait until we check their session before deciding what to draw on screen */}
+    <AuthContext.Provider value={{ session, profile, isAuthenticated, login, logout, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
