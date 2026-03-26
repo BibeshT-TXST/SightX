@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -7,6 +8,31 @@ import PrintIcon from '@mui/icons-material/Print';
 import DashboardLayout from '../components/layout/DashboardLayout';
 
 export default function RetinalScanPage() {
+  
+  const [scanResult, setScanResult] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const fileInputRef = useRef(null);
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setIsProcessing(true);
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      // Send to our Node.js Backend API
+      const response = await fetch('http://localhost:5000/api/scan/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      setScanResult(data);
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <Box sx={{ maxWidth: 1152, mx: 'auto', width: '100%', p: { xs: 3, md: 4 }, pb: 12 }}>
