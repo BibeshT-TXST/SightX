@@ -8,7 +8,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { TextField, MenuItem } from '@mui/material';
 import { useAuth } from '../context/AuthContext'; 
-import { supabase } from '../lib/supabaseClient'; 
+import { supabase } from '../lib/supabase'; 
 
 export default function RetinalScanPage() {
 
