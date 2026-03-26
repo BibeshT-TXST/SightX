@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export default function LoginForm({ darkMode = false }) {
   const [email, setEmail] = useState('');
@@ -42,10 +43,10 @@ export default function LoginForm({ darkMode = false }) {
       await login(email, password);
 
       // 2. Play the scanning animation slightly
-      setTimeout(() => {
+      setTimeout(async () => {
         setIsScanning(false);
-        const { data: { user } } = supabase.auth.getUser();
-        const { data: currentProfile } = supabase.from('profiles').select('*').eq('id', user.id).single();
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: currentProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
         if (currentProfile?.role === 'superuser') {
           navigate('/admin/create-user');
