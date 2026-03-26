@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -6,12 +6,24 @@ import { useNavigate } from 'react-router-dom';
 export default function AdminCreateUserPage() {
     const { logout } = useAuth();
     const navigate = useNavigate();
+
+    useEffect(() => {
+        if (!profile || profile.role !== 'superuser') {
+            navigate('/', { replace: true });
+            // 'replace: true' destroys the browser history
+        }
+    }, [profile, navigate]);
+
     // Added role and clinicalUnit to our state
     const [formData, setFormData] = useState({
         email: '', password: '', firstName: '', lastName: '',
         practitionerId: '', role: 'clinician', clinicalUnit: ''
     });
     const [statusMsg, setStatusMsg] = useState('');
+
+    if (!profile || profile.role !== 'superuser') {
+        return null;
+    }
 
     const handleCreate = async (e) => {
         e.preventDefault();
