@@ -6,12 +6,52 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HelpIcon from '@mui/icons-material/Help';
 import PrintIcon from '@mui/icons-material/Print';
 import DashboardLayout from '../components/layout/DashboardLayout';
+import { TextField, MenuItem } from '@mui/material';
+import { useAuth } from '../context/AuthContext'; 
+import { supabase } from '../lib/supabaseClient'; 
 
 export default function RetinalScanPage() {
+
+  const { user, profile } = useAuth(); // Assume user.id and profile.first_name exist
+  const [patientName, setPatientName] = useState('');
+  const [patientId, setPatientId] = useState('');
+  const [finalDiagnosis, setFinalDiagnosis] = useState('');
   
   const [scanResult, setScanResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Auto-populate the Final Diagnosis field with the AI's prediction
+  useEffect(() => {
+    if (scanResult) {
+      setFinalDiagnosis(scanResult.tier);
+    }
+  }, [scanResult]);
+
+  const handleConfirmScan = async () => {
+    const { error } = await supabase
+        .from('patient_scans')
+        .insert([
+            {
+                patient_name: patientName,
+                patient_id: patientId,
+                practitioner_id: user.id, // Implicit tracking
+                clinician_name: `${profile.first_name} ${profile.last_name}`,
+                ai_diagnosis: scanResult.tier,
+                final_diagnosis: finalDiagnosis
+            }
+        ]);
+    if (!error) {
+        alert('Patient record successfully confirmed & saved!');
+        // Reset everything for the next patient
+        setScanResult(null);
+        setPatientName('');
+        setPatientId('');
+    } else {
+        console.error('Save failed:', error);
+    }
+  };
+
   const processFile = async (file) => {
     if (!file) return;
     setIsProcessing(true);
