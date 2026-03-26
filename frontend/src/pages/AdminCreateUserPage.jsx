@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminCreateUserPage() {
-    const { logout } = useAuth();
+    const { logout, profile } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
