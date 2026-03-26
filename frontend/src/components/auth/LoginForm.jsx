@@ -20,7 +20,7 @@ export default function LoginForm({ darkMode = false }) {
   const [password, setPassword] = useState('');
   const [step, setStep] = useState(1); // 1 = email, 2 = password
   const [isScanning, setIsScanning] = useState(false);
-  const { login } = useAuth();
+  const { login, profile } = useAuth();
   const navigate = useNavigate();
 
   const [authError, setAuthError] = useState('');
@@ -44,7 +44,14 @@ export default function LoginForm({ darkMode = false }) {
       // 2. Play the scanning animation slightly
       setTimeout(() => {
         setIsScanning(false);
-        navigate('/dashboard'); // Proceed to dashboard
+        const { data: { user } } = supabase.auth.getUser();
+        const { data: currentProfile } = supabase.from('profiles').select('*').eq('id', user.id).single();
+
+        if (currentProfile?.role === 'superuser') {
+          navigate('/admin/create-user');
+        } else {
+          navigate('/dashboard');
+        }
       }, 1500);
     } catch (err) {
       // If Supabase rejects them (wrong password, etc.)
