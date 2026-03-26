@@ -310,10 +310,10 @@ export default function RetinalScanPage() {
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
               <Typography sx={{ fontSize: '1.875rem', fontWeight: 900, color: '#00685f' }}>
-                Normal
+                {scanResult ? scanResult.tier : 'Awaiting Scan'}
               </Typography>
               <Typography sx={{ fontSize: '0.75rem', fontWeight: 500, color: '#414755' }}>
-                No immediate flags
+                {scanResult ? scanResult.action : 'Upload an image to begin'}
               </Typography>
             </Box>
           </Box>
@@ -340,9 +340,9 @@ export default function RetinalScanPage() {
               Metric Scoreboard
             </Typography>
             {[
-              { label: 'Metric 1', value: 'N/A', color: '#0057c0' },
-              { label: 'Metric 2', value: 'N/A', color: '#0057c0' },
-              { label: 'Metric 3', value: 'N/A', color: '#00685f' },
+              { label: 'Inference Time', value: scanResult ? `${scanResult.inference_time_ms} ms` : 'N/A', color: '#0057c0' },
+              { label: 'Confidence Score', value: scanResult ? `${(scanResult.confidence * 100).toFixed(1)}%` : 'N/A', color: '#0057c0' },
+              { label: 'Raw Model Grade', value: scanResult ? scanResult.raw_model_grade_label : 'N/A', color: '#00685f' },
             ].map((m) => (
               <Box
                 key={m.label}
