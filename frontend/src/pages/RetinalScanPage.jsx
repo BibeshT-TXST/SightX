@@ -252,38 +252,6 @@ export default function RetinalScanPage() {
               </Typography>
             </Box>
 
-            <Box sx={{ pt: 3 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography
-                  sx={{
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    color: '#414755',
-                  }}
-                >
-                  INFERENCE ENGINE LOAD
-                </Typography>
-                <Typography sx={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>0.0%</Typography>
-              </Box>
-              <Box
-                sx={{
-                  width: '100%',
-                  height: 8,
-                  bgcolor: '#dee3eb',
-                  borderRadius: '1rem',
-                  overflow: 'hidden',
-                }}
-              >
-                <Box
-                  sx={{
-                    width: '0%',
-                    height: '100%',
-                    bgcolor: '#0057c0',
-                    transition: 'width 1s',
-                  }}
-                />
-              </Box>
-            </Box>
           </Box>
         </Box>
 
