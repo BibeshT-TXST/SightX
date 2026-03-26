@@ -1,11 +1,11 @@
 # Stage 1: Build the React application
-FROM node:24-bookworm-slim AS build
+FROM --platform=arm64 node:24-bookworm-slim AS build
 
 WORKDIR /app
 
 # Copy package files first to leverage Docker cache
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install --no-audit --no-fund
 
 # Copy the rest of the app source code
 COPY . .
