@@ -4,14 +4,17 @@ import { useAuth } from '../context/AuthContext';
 
 export default function AdminCreateUserPage() {
     const { logout } = useAuth();
-    const [formData, setFormData] = useState({ email: '', password: '', firstName: '', lastName: '', practitionerId: '' });
+    // Added role and clinicalUnit to our state
+    const [formData, setFormData] = useState({
+        email: '', password: '', firstName: '', lastName: '',
+        practitionerId: '', role: 'clinician', clinicalUnit: ''
+    });
     const [statusMsg, setStatusMsg] = useState('');
 
     const handleCreate = async (e) => {
         e.preventDefault();
         setStatusMsg('Creating user...');
 
-        // 1. Send the signup request with the Metadata attached!
         const { error } = await supabase.auth.signUp({
             email: formData.email,
             password: formData.password,
@@ -19,8 +22,9 @@ export default function AdminCreateUserPage() {
                 data: {
                     first_name: formData.firstName,
                     last_name: formData.lastName,
-                    practitioner_id: formData.practitionerId
-                    // The Database Trigger grabs these 3 exactly, and defaults the role to 'clinician'!
+                    practitioner_id: formData.practitionerId,
+                    role: formData.role,
+                    clinical_unit: formData.clinicalUnit
                 }
             }
         });
@@ -30,28 +34,41 @@ export default function AdminCreateUserPage() {
             return;
         }
 
-        // 2. The Super User is now accidentally logged out! 
-        // Wait for the new session to lock in, then intentionally sign out to dump them to login.
-        setStatusMsg('Success! User Created. You have been logged out.');
+        setStatusMsg('Success! User Created. You are being logged out so they can log in.');
         setTimeout(() => {
             logout();
-            // Depending on your routing, logout() might auto-kick them to '/login'
-        }, 2000);
+        }, 2500);
     };
 
     return (
-        <div style={{ padding: '2rem' }}>
-            <h1>Super User Portal: Add Clinician</h1>
-            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '300px' }}>
-                <input type="text" placeholder="First Name" onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} required />
-                <input type="text" placeholder="Last Name" onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} required />
-                <input type="text" placeholder="Clinician ID (e.g. DOC-123)" onChange={(e) => setFormData({ ...formData, practitionerId: e.target.value })} required />
-                <input type="email" placeholder="Login Email" onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
-                <input type="password" placeholder="Temp Password" onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '100%', maxWidth: '400px' }}>
+                <h1>Register Clinician</h1>
+                <p style={{ marginBottom: '2rem' }}>Please fill out your details below.</p>
 
-                <button type="submit">Create User & Sign Out</button>
-            </form>
-            <p>{statusMsg}</p>
+                <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <input style={{ flex: 1 }} type="text" placeholder="First Name" onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} required />
+                        <input style={{ flex: 1 }} type="text" placeholder="Last Name" onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} required />
+                    </div>
+
+                    <input type="text" placeholder="Clinician ID (e.g. DOC-123)" onChange={(e) => setFormData({ ...formData, practitionerId: e.target.value })} required />
+                    <input type="text" placeholder="Clinical Unit (e.g. Ophthalmology)" onChange={(e) => setFormData({ ...formData, clinicalUnit: e.target.value })} required />
+
+                    <select onChange={(e) => setFormData({ ...formData, role: e.target.value })} value={formData.role} required style={{ padding: '8px' }}>
+                        <option value="clinician">Standard Clinician</option>
+                        <option value="superuser">Super User (Admin)</option>
+                    </select>
+
+                    <input type="email" placeholder="Login Email" onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+                    <input type="password" placeholder="Password" onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+
+                    <button type="submit" style={{ padding: '10px', marginTop: '10px', backgroundColor: '#0057c0', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                        Create User & Sign Out
+                    </button>
+                </form>
+                <p style={{ marginTop: '1rem', fontWeight: 'bold' }}>{statusMsg}</p>
+            </div>
         </div>
     )
 }
