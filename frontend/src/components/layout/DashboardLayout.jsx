@@ -29,13 +29,13 @@ const navLinkBase = {
 };
 
 export default function DashboardLayout({ children }) {
-  const { logout } = useAuth();
+  const { logout, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleSignOut = () => {
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -202,10 +202,10 @@ export default function DashboardLayout({ children }) {
 
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#171c22' }}>
-                Account holder Name
+                {profile ? `${profile.first_name} ${profile.last_name}` : 'Account holder Name'}
               </Typography>
-              <Typography sx={{ fontSize: '0.625rem', color: '#414755' }}>
-                Account holder Role
+              <Typography sx={{ fontSize: '0.625rem', color: '#414755', textTransform: 'capitalize' }}>
+                {profile ? profile.role : 'Account holder Role'}
               </Typography>
             </Box>
           </Box>

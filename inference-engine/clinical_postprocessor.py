@@ -77,9 +77,9 @@ def bayesian_prior_correction(softmax_probs: np.ndarray,
 # Reclassify the 5 DR grades into 3 clinically actionable tiers.
 
 TIER_LABELS = {
-    0: {'name': 'No Disease',                'emoji': '🟢', 'action': 'No follow-up needed'},
-    1: {'name': 'Doctor Visit Recommended',  'emoji': '🟡', 'action': 'Schedule ophthalmology appointment'},
-    2: {'name': 'Doctor Visit Required',     'emoji': '🔴', 'action': 'Urgent referral to specialist'},
+    0: {'name': 'Doctor Visit Optional',  'emoji': '🟢', 'action': 'Optional follow-up depending on patient history'},
+    1: {'name': 'Doctor Visit Required',  'emoji': '🟡', 'action': 'Schedule ophthalmology appointment'},
+    2: {'name': 'Doctor Visit Mandatory', 'emoji': '🔴', 'action': 'Urgent referral to specialist'},
 }
 
 # Which model grades map to which clinical tier
@@ -89,10 +89,10 @@ GRADE_TO_TIER = {0: 0, 1: 1, 2: 1, 3: 1, 4: 2}
 # Key insight: missing disease (predicting "No Disease" for a sick patient)
 # is FAR more costly than over-referring (predicting "Required" for a healthy one).
 COST_MATRIX = np.array([
-    # Pred:  No Disease  Recommended  Required
-    [0.0,       1.0,         2.0],     # True: No Disease
-    [10.0,      0.0,         1.0],     # True: Recommended (Grades 1-3)
-    [50.0,      5.0,         0.0],     # True: Required    (Grade 4)
+    # Pred:  Optional  Required    Mandatory
+    [0.0,       1.0,         2.0],     # True: Optional
+    [10.0,      0.0,         1.0],     # True: Required (Grades 1-3)
+    [50.0,      5.0,         0.0],     # True: Mandatory (Grade 4)
 ])
 
 

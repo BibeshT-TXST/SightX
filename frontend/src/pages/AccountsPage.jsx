@@ -6,44 +6,54 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import DownloadIcon from '@mui/icons-material/Download';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
-
-const SCAN_ROWS = [
-  {
-    date: '[Date]',
-    time: '[Time]',
-    patient: '[Patient Name]',
-    diagnosis: '[AI Diagnosis]',
-    diagnosisColor: 'tertiary',
-    finalDiagnosis: '[Final Diagnosis]',
-    finalDiagnosisColor: 'tertiary',
-  },
-  {
-    date: '[Date]',
-    time: '[Time]',
-    patient: '[Patient Name]',
-    diagnosis: '[AI Diagnosis]',
-    diagnosisColor: 'error',
-    finalDiagnosis: '[Final Diagnosis]',
-    finalDiagnosisColor: 'error',
-  },
-  {
-    date: '[Date]',
-    time: '[Time]',
-    patient: '[Patient Name]',
-    diagnosis: '[AI Diagnosis]',
-    diagnosisColor: 'tertiary',
-    finalDiagnosis: '[Final Diagnosis]',
-    finalDiagnosisColor: 'tertiary',
-  },
-];
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const diagnosisStyles = {
   tertiary: { bgcolor: '#008378', color: '#f4fffc' },
   error: { bgcolor: '#ffdad6', color: '#93000a' },
+  warning: { bgcolor: '#ffddb3', color: '#8a4b00' },
+};
+
+const getDiagnosisColor = (diagnosis) => {
+    if (!diagnosis) return 'tertiary';
+    if (diagnosis.includes('Mandatory')) return 'error';
+    if (diagnosis.includes('Required')) return 'warning';
+    return 'tertiary';
+};
+
+const formatDate = (dateString) => {
+    const d = new Date(dateString);
+    return {
+        date: d.toLocaleDateString(),
+        time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
 };
 
 export default function AccountsPage() {
+  const { session, profile } = useAuth();
+  const [scans, setScans] = useState([]);
+
+  useEffect(() => {
+    async function fetchScans() {
+      if (!session) return;
+      const { data, error } = await supabase
+        .from('patient_scans')
+        .select('*')
+        .eq('practitioner_id', session.user.id)
+        .order('created_at', { ascending: false });
+        
+      if (!error && data) {
+        setScans(data);
+      } else {
+        console.error('Error fetching scans:', error);
+      }
+    }
+    fetchScans();
+  }, [session]);
+
   return (
     <DashboardLayout>
       <Box sx={{ maxWidth: 1280, mx: 'auto', width: '100%', p: { xs: 3, md: 5 }, pb: 12 }}>
@@ -68,7 +78,7 @@ export default function AccountsPage() {
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                [ Name ]
+                {profile ? `${profile.first_name} ${profile.last_name}` : '[ Name ]'}
               </Typography>
               <Box
                 sx={{
@@ -87,7 +97,7 @@ export default function AccountsPage() {
                   letterSpacing: '0.08em',
                 }}
               >
-                [ Role ]
+                {profile ? profile.role : '[ Role ]'}
               </Box>
 
               <Box
@@ -102,9 +112,9 @@ export default function AccountsPage() {
                 }}
               >
                 {[
-                  { label: 'Last Session', value: '[ Date • Time ]' },
-                  { label: 'Clinical Unit', value: '[ Unit ]' },
-                  { label: 'Practitioner ID', value: '[ ID ]', mono: true },
+                  { label: 'Last Session', value: scans.length > 0 ? `${formatDate(scans[0].created_at).date} • ${formatDate(scans[0].created_at).time}` : 'No sessions' },
+                  { label: 'Clinical Unit', value: profile ? profile.clinical_unit : '[ Unit ]' },
+                  { label: 'Practitioner ID', value: profile ? profile.practitioner_id : '[ ID ]', mono: true },
                 ].map((item) => (
                   <Box
                     key={item.label}
@@ -163,7 +173,7 @@ export default function AccountsPage() {
                     mt: 0.5,
                   }}
                 >
-                  [ Number ]
+                  {scans.length}
                 </Typography>
               </Box>
 
@@ -261,10 +271,15 @@ export default function AccountsPage() {
                 </Box>
               </Box>
               <Box component="tbody">
-                {SCAN_ROWS.map((row) => (
+                {scans.map((row) => {
+                  const { date, time } = formatDate(row.created_at);
+                  const aiColorKey = getDiagnosisColor(row.ai_diagnosis);
+                  const finalColorKey = getDiagnosisColor(row.final_diagnosis);
+
+                  return (
                   <Box
                     component="tr"
-                    key={row.patient}
+                    key={row.id}
                     sx={{
                       borderBottom: '1px solid rgba(193,198,215,0.08)',
                       transition: 'background-color 0.2s',
@@ -273,7 +288,7 @@ export default function AccountsPage() {
                   >
                     <Box component="td" sx={{ px: 4, py: 2.5 }}>
                       <Typography sx={{ fontSize: '0.875rem', fontWeight: 700 }}>
-                        {row.date}
+                        {date}
                       </Typography>
                       <Typography
                         sx={{
@@ -282,13 +297,13 @@ export default function AccountsPage() {
                           fontFamily: 'monospace',
                         }}
                       >
-                        {row.time}
+                        {time}
                       </Typography>
                     </Box>
 
                     <Box component="td" sx={{ px: 3, py: 2.5 }}>
                       <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
-                        {row.patient}
+                        {row.patient_name}
                       </Typography>
                     </Box>
                     <Box component="td" sx={{ px: 3, py: 2.5 }}>
@@ -302,10 +317,10 @@ export default function AccountsPage() {
                           borderRadius: '1.5rem',
                           fontSize: '0.75rem',
                           fontWeight: 600,
-                          ...diagnosisStyles[row.diagnosisColor],
+                          ...diagnosisStyles[aiColorKey],
                         }}
                       >
-                        {row.diagnosis}
+                        {row.ai_diagnosis}
                       </Box>
                     </Box>
                     <Box component="td" sx={{ px: 4, py: 2.5, textAlign: 'right' }}>
@@ -319,14 +334,14 @@ export default function AccountsPage() {
                           borderRadius: '1.5rem',
                           fontSize: '0.75rem',
                           fontWeight: 600,
-                          ...diagnosisStyles[row.finalDiagnosisColor],
+                          ...diagnosisStyles[finalColorKey],
                         }}
                       >
-                        {row.finalDiagnosis}
+                        {row.final_diagnosis}
                       </Box>
                     </Box>
                   </Box>
-                ))}
+                )})}
               </Box>
             </Box>
 
@@ -342,7 +357,7 @@ export default function AccountsPage() {
               }}
             >
               <Typography sx={{ fontSize: '0.75rem', color: '#414755', fontWeight: 500 }}>
-                Showing [ number of scans] of [ total number of scans]
+                Showing {scans.length} of {scans.length} scans
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.5 }}>
                 {[

@@ -14,14 +14,17 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 export default function LoginForm({ darkMode = false }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [step, setStep] = useState(1); // 1 = email, 2 = password
   const [isScanning, setIsScanning] = useState(false);
-  const { login } = useAuth();
+  const { login, profile } = useAuth();
   const navigate = useNavigate();
+
+  const [authError, setAuthError] = useState('');
 
   const handleContinue = (e) => {
     e.preventDefault();
@@ -30,47 +33,66 @@ export default function LoginForm({ darkMode = false }) {
     }
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => { // <-- MAKE THIS A ASYNC FUNCTION
     e.preventDefault();
+    setAuthError('');
     setIsScanning(true);
-    // Simulate scanning animation, then navigate to dashboard
-    setTimeout(() => {
+
+    try {
+      // 1. Attempt the real login
+      await login(email, password);
+
+      // 2. Play the scanning animation slightly
+      setTimeout(async () => {
+        setIsScanning(false);
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: currentProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+
+        if (currentProfile?.role === 'superuser') {
+          navigate('/admin/create-user');
+        } else {
+          navigate('/dashboard');
+        }
+      }, 1500);
+    } catch (err) {
+      // If Supabase rejects them (wrong password, etc.)
       setIsScanning(false);
-      login();
-      navigate('/dashboard');
-    }, 2400);
+      setAuthError(err.message);
+    }
   };
 
   const handleBack = () => {
     setStep(1);
+    setAuthError(''); // This also clears out the red error box when they go back!
   };
+
 
   // ── Color tokens based on mode ──
   const c = darkMode
     ? {
-        heading: '#aec6ff',
-        cardBg: 'rgba(20, 25, 35, 0.85)',
-        cardBorder: 'rgba(174, 198, 255, 0.08)',
-        cardShadow: '0 20px 60px rgba(0,0,0,0.4)',
-        textPrimary: '#e0e4ef',
-        textSecondary: '#8b92a8',
-        inputBg: 'rgba(255,255,255,0.06)',
-        linkColor: '#aec6ff',
-        linkHover: '#d8e2ff',
-        scanGlow: 'rgba(174, 198, 255, 0.3)',
-      }
+      heading: '#aec6ff',
+      cardBg: 'rgba(20, 25, 35, 0.85)',
+      cardBorder: 'rgba(174, 198, 255, 0.08)',
+      cardShadow: '0 20px 60px rgba(0,0,0,0.4)',
+      textPrimary: '#e0e4ef',
+      textSecondary: '#8b92a8',
+      inputBg: 'rgba(255,255,255,0.06)',
+      linkColor: '#aec6ff',
+      linkHover: '#d8e2ff',
+      scanGlow: 'rgba(174, 198, 255, 0.3)',
+    }
     : {
-        heading: '#0057c0',
-        cardBg: '#ffffff',
-        cardBorder: 'rgba(23,28,34,0.03)',
-        cardShadow: '0 20px 40px rgba(0,87,192,0.06)',
-        textPrimary: '#171c22',
-        textSecondary: '#414755',
-        inputBg: '#e4e8f0',
-        linkColor: '#0057c0',
-        linkHover: '#004397',
-        scanGlow: 'rgba(0, 87, 192, 0.2)',
-      };
+      heading: '#0057c0',
+      cardBg: '#ffffff',
+      cardBorder: 'rgba(23,28,34,0.03)',
+      cardShadow: '0 20px 40px rgba(0,87,192,0.06)',
+      textPrimary: '#171c22',
+      textSecondary: '#414755',
+      inputBg: '#e4e8f0',
+      linkColor: '#0057c0',
+      linkHover: '#004397',
+      scanGlow: 'rgba(0, 87, 192, 0.2)',
+    };
 
   const focusGlowSx = {
     transition: 'box-shadow 0.3s ease, background-color 0.3s ease',
@@ -297,6 +319,28 @@ export default function LoginForm({ darkMode = false }) {
                   </Typography>
                 </Box>
               </Box>
+
+              {authError && (
+                <Fade in={!!authError}>
+                  <Box
+                    sx={{
+                      mb: 3,
+                      p: 1.5,
+                      borderRadius: '0.5rem',
+                      bgcolor: darkMode ? 'rgba(244, 67, 54, 0.1)' : 'rgba(211, 47, 47, 0.08)',
+                      border: '1px solid',
+                      borderColor: darkMode ? 'rgba(244, 67, 54, 0.3)' : 'rgba(211, 47, 47, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Typography sx={{ color: darkMode ? '#ffb4ab' : '#d32f2f', fontSize: '0.8rem', fontWeight: 600 }}>
+                      Incorrect email or password. Please try again.
+                    </Typography>
+                  </Box>
+                </Fade>
+              )}
 
               <Box component="form" onSubmit={handleLogin} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <Box>

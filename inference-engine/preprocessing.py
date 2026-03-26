@@ -72,6 +72,20 @@ inference_transforms = transforms.Compose([
     transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
 ])
 
+# ── Test-Time Augmentation (TTA) Transforms ──────────────────────────────────
+# Used during the 108-iteration ensemble loop to create slightly perturbed
+# views of the same retina, improving robustness and capturing uncertainty.
+tta_transforms = transforms.Compose([
+    transforms.Resize(int(IMG_SIZE * 1.15)),
+    transforms.RandomCrop(IMG_SIZE),          # Randomly crop instead of CenterCrop
+    transforms.RandomHorizontalFlip(p=0.5),   # Mirror image (left/right eyes)
+    transforms.RandomVerticalFlip(p=0.5),     # Mirror image
+    transforms.RandomRotation(15),            # Slight ±15° rotation
+    transforms.ColorJitter(brightness=0.1, contrast=0.1), # Minor color shifts
+    transforms.ToTensor(),
+    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
+])
+
 
 # ── Inference Preprocessing Function ─────────────────────────────────────────
 def preprocess_image(image_path: str) -> torch.Tensor:

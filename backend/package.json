@@ -13,9 +13,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "axios": "^1.13.6",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
+    "form-data": "^4.0.5",
+    "multer": "^2.1.1",
     "pg": "^8.18.0"
   },
   "devDependencies": {

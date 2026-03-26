@@ -10,6 +10,7 @@ import AccountsPage from './pages/AccountsPage';
 import LegalsPage from './pages/LegalsPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
+import AdminCreateUserPage from './pages/AdminCreateUserPage';
 
 function LandingPage() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin/create-user" element={<AdminCreateUserPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<RetinalScanPage />} />
             <Route path="/dashboard/accounts" element={<AccountsPage />} />
