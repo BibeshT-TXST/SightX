@@ -7,3 +7,6 @@ numpy
 scikit-learn
 opencv-python-headless
 matplotlib
+fastapi
+uvicorn
+python-multipart

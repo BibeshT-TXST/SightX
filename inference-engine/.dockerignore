@@ -1,6 +1,5 @@
 # Exclude data to prevent large build context
 data/
-checkpoints/
 
 # Exclude virtual environment and git
 .venv/
