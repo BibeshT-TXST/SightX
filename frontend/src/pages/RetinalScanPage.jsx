@@ -12,13 +12,14 @@ import { supabase } from '../lib/supabase';
 
 export default function RetinalScanPage() {
 
-  const { user, profile } = useAuth(); // Assume user.id and profile.first_name exist
+  const { session, profile } = useAuth(); // Assume session and profile exist
   const [patientName, setPatientName] = useState('');
   const [patientId, setPatientId] = useState('');
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
   
   const [scanResult, setScanResult] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const fileInputRef = useRef(null);
 
   // Auto-populate the Final Diagnosis field with the AI's prediction
@@ -35,18 +36,24 @@ export default function RetinalScanPage() {
             {
                 patient_name: patientName,
                 patient_id: patientId,
-                practitioner_id: user.id, // Implicit tracking
+                practitioner_id: session.user.id, // Implicit tracking
                 clinician_name: `${profile.first_name} ${profile.last_name}`,
                 ai_diagnosis: scanResult.tier,
                 final_diagnosis: finalDiagnosis
             }
         ]);
     if (!error) {
-        alert('Patient record successfully confirmed & saved!');
+        setIsSuccess(true);
         // Reset everything for the next patient
         setScanResult(null);
         setPatientName('');
         setPatientId('');
+        setFinalDiagnosis('');
+
+        // Clear the success message after 3 seconds
+        setTimeout(() => {
+            setIsSuccess(false);
+        }, 3000);
     } else {
         console.error('Save failed:', error);
     }
@@ -170,8 +177,8 @@ export default function RetinalScanPage() {
                 justifyContent: 'center',
                 overflow: 'hidden',
                 transition: 'all 0.3s',
-                cursor: isProcessing ? 'default' : 'pointer',
-                pointerEvents: isProcessing ? 'none' : 'auto',
+                cursor: isProcessing || isSuccess ? 'default' : 'pointer',
+                pointerEvents: isProcessing || isSuccess ? 'none' : 'auto',
                 '&:hover': {
                   borderColor: 'rgba(0,87,192,0.4)',
                   bgcolor: 'rgba(0,87,192,0.03)',
@@ -202,7 +209,7 @@ export default function RetinalScanPage() {
                     width: 80,
                     height: 80,
                     borderRadius: '50%',
-                    bgcolor: 'rgba(0,87,192,0.1)',
+                    bgcolor: isSuccess ? 'rgba(0,131,120,0.1)' : 'rgba(0,87,192,0.1)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -212,28 +219,34 @@ export default function RetinalScanPage() {
                     '&:hover': { transform: 'scale(1.1)' },
                   }}
                 >
-                  <CloudUploadIcon sx={{ fontSize: 40, color: '#0057c0' }} />
+                  {isSuccess ? (
+                    <CheckCircleIcon sx={{ fontSize: 40, color: '#008378' }} />
+                  ) : (
+                    <CloudUploadIcon sx={{ fontSize: 40, color: '#0057c0' }} />
+                  )}
                 </Box>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: '#171c22', mb: 0.5 }}>
-                  {isProcessing ? 'Processing Scan...' : 'Upload Fundus Image'}
+                <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: isSuccess ? '#00685f' : '#171c22', mb: 0.5 }}>
+                  {isProcessing ? 'Processing Scan...' : isSuccess ? 'Patient Record Saved!' : 'Upload Fundus Image'}
                 </Typography>
                 <Typography sx={{ color: '#414755', fontSize: '0.875rem', mb: 3 }}>
-                  Drag and drop high resolution clinical exports
+                  {isSuccess ? 'Database successfully synced.' : 'Drag and drop high resolution clinical exports'}
                 </Typography>
-                <Button
-                  variant="contained"
-                  sx={{
-                    px: 4,
-                    py: 1.5,
-                    borderRadius: '0.75rem',
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #0057c0 0%, #006ff0 100%)',
-                    boxShadow: '0 8px 20px rgba(0,87,192,0.2)',
-                    '&:active': { transform: 'scale(0.95)' },
-                  }}
-                >
-                  Browse Clinical Files
-                </Button>
+                {!isSuccess && (
+                  <Button
+                    variant="contained"
+                    sx={{
+                      px: 4,
+                      py: 1.5,
+                      borderRadius: '0.75rem',
+                      fontWeight: 700,
+                      background: 'linear-gradient(135deg, #0057c0 0%, #006ff0 100%)',
+                      boxShadow: '0 8px 20px rgba(0,87,192,0.2)',
+                      '&:active': { transform: 'scale(0.95)' },
+                    }}
+                  >
+                    Browse Clinical Files
+                  </Button>
+                )}
               </Box>
             </Box>
           ) : (
