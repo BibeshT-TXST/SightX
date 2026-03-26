@@ -7,6 +7,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DashboardLayout from '../components/layout/DashboardLayout';
+import { useAuth } from '../context/AuthContext';
 
 const SCAN_ROWS = [
   {
@@ -44,6 +45,8 @@ const diagnosisStyles = {
 };
 
 export default function AccountsPage() {
+  const { profile } = useAuth();
+
   return (
     <DashboardLayout>
       <Box sx={{ maxWidth: 1280, mx: 'auto', width: '100%', p: { xs: 3, md: 5 }, pb: 12 }}>
@@ -68,7 +71,7 @@ export default function AccountsPage() {
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                [ Name ]
+                {profile ? `${profile.first_name} ${profile.last_name}` : '[ Name ]'}
               </Typography>
               <Box
                 sx={{
@@ -87,7 +90,7 @@ export default function AccountsPage() {
                   letterSpacing: '0.08em',
                 }}
               >
-                [ Role ]
+                {profile ? profile.role : '[ Role ]'}
               </Box>
 
               <Box
@@ -103,8 +106,8 @@ export default function AccountsPage() {
               >
                 {[
                   { label: 'Last Session', value: '[ Date • Time ]' },
-                  { label: 'Clinical Unit', value: '[ Unit ]' },
-                  { label: 'Practitioner ID', value: '[ ID ]', mono: true },
+                  { label: 'Clinical Unit', value: profile ? profile.clinical_unit : '[ Unit ]' },
+                  { label: 'Practitioner ID', value: profile ? profile.practitioner_id : '[ ID ]', mono: true },
                 ].map((item) => (
                   <Box
                     key={item.label}
