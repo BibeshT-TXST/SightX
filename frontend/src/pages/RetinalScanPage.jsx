@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -151,90 +151,124 @@ export default function RetinalScanPage() {
             mb: 3,
           }}
         >
-          {/* Upload Zone */}
-          <Box
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            sx={{
-              position: 'relative',
-              height: 480,
-              borderRadius: '0.75rem',
-              border: '2px dashed',
-              borderColor: '#c1c6d7',
-              bgcolor: '#ffffff',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              transition: 'all 0.3s',
-              cursor: isProcessing ? 'default' : 'pointer',
-              pointerEvents: isProcessing ? 'none' : 'auto',
-              '&:hover': {
-                borderColor: 'rgba(0,87,192,0.4)',
-                bgcolor: 'rgba(0,87,192,0.03)',
-              },
-            }}
-          >
-            <input 
-              type="file" 
-              accept="image/jpeg, image/png" 
-              style={{ display: 'none' }} 
-              ref={fileInputRef} 
-              onChange={handleFileUpload}
-            />
-            {/* Radial glow */}
+          {/* Upload Zone / Confirmation Form */}
+          {!scanResult ? (
             <Box
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
               sx={{
-                position: 'absolute',
-                inset: 0,
-                opacity: 0.1,
-                background:
-                  'radial-gradient(circle at center, #0057c0, transparent 70%)',
-                pointerEvents: 'none',
+                position: 'relative',
+                height: 480,
+                borderRadius: '0.75rem',
+                border: '2px dashed',
+                borderColor: '#c1c6d7',
+                bgcolor: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                transition: 'all 0.3s',
+                cursor: isProcessing ? 'default' : 'pointer',
+                pointerEvents: isProcessing ? 'none' : 'auto',
+                '&:hover': {
+                  borderColor: 'rgba(0,87,192,0.4)',
+                  bgcolor: 'rgba(0,87,192,0.03)',
+                },
               }}
-            />
-            <Box sx={{ zIndex: 1, textAlign: 'center' }}>
+            >
+              <input 
+                type="file" 
+                accept="image/jpeg, image/png" 
+                style={{ display: 'none' }} 
+                ref={fileInputRef} 
+                onChange={handleFileUpload}
+              />
+              {/* Radial glow */}
               <Box
                 sx={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: '50%',
-                  bgcolor: 'rgba(0,87,192,0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mx: 'auto',
-                  mb: 2,
-                  transition: 'transform 0.3s',
-                  '&:hover': { transform: 'scale(1.1)' },
+                  position: 'absolute',
+                  inset: 0,
+                  opacity: 0.1,
+                  background:
+                    'radial-gradient(circle at center, #0057c0, transparent 70%)',
+                  pointerEvents: 'none',
                 }}
-              >
-                <CloudUploadIcon sx={{ fontSize: 40, color: '#0057c0' }} />
+              />
+              <Box sx={{ zIndex: 1, textAlign: 'center' }}>
+                <Box
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(0,87,192,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    mx: 'auto',
+                    mb: 2,
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'scale(1.1)' },
+                  }}
+                >
+                  <CloudUploadIcon sx={{ fontSize: 40, color: '#0057c0' }} />
+                </Box>
+                <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: '#171c22', mb: 0.5 }}>
+                  {isProcessing ? 'Processing Scan...' : 'Upload Fundus Image'}
+                </Typography>
+                <Typography sx={{ color: '#414755', fontSize: '0.875rem', mb: 3 }}>
+                  Drag and drop high resolution clinical exports
+                </Typography>
+                <Button
+                  variant="contained"
+                  sx={{
+                    px: 4,
+                    py: 1.5,
+                    borderRadius: '0.75rem',
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #0057c0 0%, #006ff0 100%)',
+                    boxShadow: '0 8px 20px rgba(0,87,192,0.2)',
+                    '&:active': { transform: 'scale(0.95)' },
+                  }}
+                >
+                  Browse Clinical Files
+                </Button>
               </Box>
-              <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: '#171c22', mb: 0.5 }}>
-                {isProcessing ? 'Processing Scan...' : 'Upload Fundus Image'}
-              </Typography>
-              <Typography sx={{ color: '#414755', fontSize: '0.875rem', mb: 3 }}>
-                Drag and drop high resolution clinical exports
-              </Typography>
-              <Button
-                variant="contained"
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: '0.75rem',
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #0057c0 0%, #006ff0 100%)',
-                  boxShadow: '0 8px 20px rgba(0,87,192,0.2)',
-                  '&:active': { transform: 'scale(0.95)' },
-                }}
-              >
-                Browse Clinical Files
-              </Button>
             </Box>
-          </Box>
+          ) : (
+            <Box sx={{ p: 4, bgcolor: '#ffffff', borderRadius: '0.75rem', border: '1px solid #c1c6d7', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: 480 }}>
+                <Typography variant="h6" mb={2} fontWeight={700}>
+                    Clinical Confirmation
+                </Typography>
+                
+                <TextField 
+                    fullWidth label="Patient Full Name" margin="normal"
+                    value={patientName} onChange={(e) => setPatientName(e.target.value)} 
+                />
+                <TextField 
+                    fullWidth label="Patient/Medical ID" margin="normal"
+                    value={patientId} onChange={(e) => setPatientId(e.target.value)} 
+                />
+                
+                <TextField 
+                    select fullWidth label="Clinician Overriding Diagnosis" margin="normal"
+                    value={finalDiagnosis} onChange={(e) => setFinalDiagnosis(e.target.value)} 
+                >
+                    <MenuItem value="Doctor Visit Optional">Doctor Visit Optional</MenuItem>
+                    <MenuItem value="Doctor Visit Required">Doctor Visit Required</MenuItem>
+                    <MenuItem value="Doctor Visit Mandatory">Doctor Visit Mandatory</MenuItem>
+                </TextField>
+
+                <Button 
+                    fullWidth variant="contained" sx={{ mt: 3, pt: 1.5, pb: 1.5, background: 'linear-gradient(135deg, #00685f 0%, #008378 100%)' }}
+                    onClick={handleConfirmScan}
+                    disabled={!patientName || !patientId}
+                >
+                    Save Patient Record
+                </Button>
+            </Box>
+          )}
 
           {/* Live Monitoring Card */}
           <Box
