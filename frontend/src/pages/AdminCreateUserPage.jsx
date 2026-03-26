@@ -52,12 +52,19 @@ export default function AdminCreateUserPage() {
                         <input style={{ flex: 1 }} type="text" placeholder="Last Name" onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} required />
                     </div>
 
-                    <input type="text" placeholder="Clinician ID (e.g. DOC-123)" onChange={(e) => setFormData({ ...formData, practitionerId: e.target.value })} required />
-                    <input type="text" placeholder="Clinical Unit (e.g. Ophthalmology)" onChange={(e) => setFormData({ ...formData, clinicalUnit: e.target.value })} required />
+                    <input type="text" placeholder="Clinician ID" onChange={(e) => setFormData({ ...formData, practitionerId: e.target.value })} required />
+                    <input type="text" placeholder="Clinical Unit" onChange={(e) => setFormData({ ...formData, clinicalUnit: e.target.value })} required />
 
-                    <select onChange={(e) => setFormData({ ...formData, role: e.target.value })} value={formData.role} required style={{ padding: '8px' }}>
-                        <option value="clinician">Standard Clinician</option>
-                        <option value="superuser">Super User (Admin)</option>
+                    <select
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        value={formData.role}
+                        required
+                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                    >
+                        <option value="" disabled>Select User Role...</option>
+                        <option value="resident">Resident</option>
+                        <option value="fellow">Fellow</option>
+                        <option value="attending">Attending Physician</option>
                     </select>
 
                     <input type="email" placeholder="Login Email" onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
