@@ -1,5 +1,5 @@
 # Stage 1: Build the React application
-FROM --platform=arm64 node:24-bookworm-slim AS build
+FROM --platform=arm64 node:20-bookworm-slim AS build
 
 WORKDIR /app
 
