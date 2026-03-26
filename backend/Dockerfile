@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 # Copy package files first (helps with layer caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install only production dependencies for a lighter image
+RUN npm ci --omit=dev
 
 # Copy the rest of your backend source code
 COPY . .
@@ -16,5 +16,5 @@ COPY . .
 # Expose the port your server runs on
 EXPOSE 5000
 
-# Use the 'dev' script we set up earlier
-CMD ["npm", "run", "dev"]
+# Use the 'start' script to run node directly instead of nodemon
+CMD ["npm", "start"]
