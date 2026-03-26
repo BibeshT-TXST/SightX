@@ -31,7 +31,7 @@ from PIL import Image
 # Local project modules
 from model import DRClassifier
 from preprocessing import inference_transforms, tta_transforms
-from clinical_postprocessor import classify_clinical_tier
+from clinical_postprocessor import classify_clinical_tier, GRADE_TO_TIER, TIER_LABELS
 
 
 # ── FastAPI Application Instance ─────────────────────────────────────────────
@@ -74,7 +74,7 @@ model.to(DEVICE)
 #   Grade 3 — Severe NPDR:        extensive intraretinal abnormalities
 #   Grade 4 — Proliferative DR:   neovascularization or vitreous hemorrhage
 GRADE_LABELS = {
-    0: 'Grade 0: No Diabetic Retinopathy',
+    0: 'Grade 0: No DR',
     1: 'Grade 1: Mild',
     2: 'Grade 2: Moderate',
     3: 'Grade 3: Severe',
@@ -165,12 +165,16 @@ async def predict(file: UploadFile = File(...)):
     mode_raw_grade = Counter(all_raw_grades).most_common(1)[0][0]
     avg_confidence = sum(all_confidences) / len(all_confidences)
 
+    # Map the ensemble mode_raw_grade directly to the semantic clinical tier
+    ensemble_tier_id = GRADE_TO_TIER[mode_raw_grade]
+    ensemble_tier_info = TIER_LABELS[ensemble_tier_id]
+
     # ── 6. Build and return the JSON response ────────────────────────────
     return JSONResponse({
-        # Clinical tier decisions (using last result's tier logic for now)
-        'tier': final_result['tier_label'],
-        'tier_emoji': final_result['tier_emoji'],
-        'action': final_result['action'],
+        # Clinical tier decisions (directly mapping the mode grade)
+        'tier': ensemble_tier_info['name'],
+        'tier_emoji': ensemble_tier_info['emoji'],
+        'action': ensemble_tier_info['action'],
         'confidence': avg_confidence,
         
         # Detailed probability breakdown
