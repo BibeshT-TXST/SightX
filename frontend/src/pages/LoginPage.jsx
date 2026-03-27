@@ -6,6 +6,11 @@ import LoginForm from '../components/auth/LoginForm';
 import NeuralNetworkBg from '../components/auth/NeuralNetworkBg';
 import logo from '../assets/logo.png';
 
+/**
+ * LoginPage component serves as the application's entry point.
+ * Features a dynamic theme switcher, a particle animation background,
+ * and a rotating branding element.
+ */
 export default function LoginPage() {
   const [darkMode, setDarkMode] = useState(true);
 

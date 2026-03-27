@@ -10,6 +10,10 @@ import { TextField, MenuItem } from '@mui/material';
 import { useAuth } from '../context/AuthContext'; 
 import { supabase } from '../lib/supabase'; 
 
+/**
+ * RetinalScanPage is the core diagnostic interface of SightX.
+ * Handles image uploads, AI inference requests, and clinical verification persistence.
+ */
 export default function RetinalScanPage() {
 
   const { session, profile } = useAuth(); // Assume session and profile exist

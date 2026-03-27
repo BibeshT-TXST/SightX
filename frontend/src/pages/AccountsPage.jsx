@@ -32,6 +32,10 @@ const formatDate = (dateString) => {
     };
 };
 
+/**
+ * AccountsPage component displays the practitioner's profile overview 
+ * and a historical log of their performed retinal scans.
+ */
 export default function AccountsPage() {
   const { session, profile } = useAuth();
   const [scans, setScans] = useState([]);
