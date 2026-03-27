@@ -3,6 +3,13 @@ import { supabase } from '../lib/supabase'; // Import our new database client
 
 const AuthContext = createContext(null);
 
+/**
+ * AuthProvider component manages the global authentication state.
+ * Interfaces with Supabase Auth to handle sessions and practitioner profiles.
+ * 
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Application components requiring auth context.
+ */
 export function AuthProvider({ children }) {
   // We now store a "session" object instead of just true/false
   const [session, setSession] = useState(null);
@@ -65,6 +72,11 @@ export function AuthProvider({ children }) {
   );
 }
 
+/**
+ * Custom hook to access the authentication context.
+ * 
+ * @returns {Object} { session, profile, isAuthenticated, login, logout, loading }
+ */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
