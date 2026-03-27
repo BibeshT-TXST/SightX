@@ -47,6 +47,80 @@ The entire SightX stack is containerized for professional deployment.
    - Backend API: `http://localhost:5001`
    - Inference Engine: `http://localhost:8000`
 
+## 🔗 Supabase Persistence & Setup
+
+SightX uses **Supabase** (Postgres + Auth + RLS) to handle practitioner profiles and diagnostic records. Follow these steps to sync your local instance with the cloud.
+
+### 1. Environment Configuration
+Create a `.env` file in the root directory (and ensure it's copied to `frontend/`, `backend/`, and `inference-engine/` if running outside Docker):
+```bash
+VITE_SUPABASE_URL=your_project_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_PUBLISHABLE_KEY
+```
+
+### 2. SQL Foundation (Schema)
+Run the following serialized SQL in your [Supabase SQL Editor](https://supabase.com/dashboard/project/_/sql) to initialize the clinical tables:
+
+```sql
+-- ── 1. Create Profiles (Practitioner Data) ──
+create table profiles (
+  id uuid references auth.users on delete cascade primary key,
+  first_name text,
+  last_name text,
+  practitioner_id text unique,
+  role text check (role in ('resident', 'fellow', 'attending', 'superuser')),
+  clinical_unit text,
+  created_at timestamptz default now()
+);
+
+-- ── 2. Create Patient Scans (Diagnostic Records) ──
+create table patient_scans (
+  id uuid primary key default gen_random_uuid(),
+  patient_name text not null,
+  patient_id text not null,
+  practitioner_id uuid references auth.users not null,
+  clinician_name text,
+  ai_diagnosis text,
+  final_diagnosis text,
+  created_at timestamptz default now()
+);
+
+-- ── 3. Profile Automation (Trigger) ──
+-- This automatically creates a profile row when a new user signs up
+create function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, first_name, last_name, role)
+  values (new.id, new.raw_user_meta_data->>'first_name', new.raw_user_meta_data->>'last_name', new.raw_user_meta_data->>'role');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+```
+
+### 3. Clinical Security (RLS)
+Enable Row Level Security (RLS) to ensure data sovereignty.
+```sql
+alter table profiles enable row level security;
+alter table patient_scans enable row level security;
+
+-- Example: Clinicians can only view their own unit's scans
+create policy "Clinicians can view all scans" on patient_scans
+  for select using (auth.role() = 'authenticated');
+
+create policy "Clinicians can insert scans" on patient_scans
+  for insert with check (auth.uid() = practitioner_id);
+```
+
+### 🧪 Research vs. B2B Deployment
+- **Research/Dev**: The [Supabase Free Plan](https://supabase.com/pricing) is sufficient for prototyping and individual trials.
+- **Institutional (B2B)**: For hospital-grade, **HIPAA/GDPR** compliant environments, a **B2B/Enterprise Plan** is required to support dedicated database instances and enhanced audit logs.
+
+---
+
 ## 🩺 Clinical Operating Mandate
 
 ### 1. Optical Hardware Requirements
