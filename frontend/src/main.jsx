@@ -1,3 +1,7 @@
+/**
+ * main.jsx — Application entry point.
+ * Initializes the React root and injects the MUI ThemeProvider and CssBaseline.
+ */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider, CssBaseline } from '@mui/material'

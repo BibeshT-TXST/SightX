@@ -12,6 +12,10 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import AdminCreateUserPage from './pages/AdminCreateUserPage';
 
+/**
+ * LandingPage component serves as the public-facing entry point of the application.
+ * Composes the TopNavBar, HeroSection, BentoGrid, and Footer.
+ */
 function LandingPage() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -25,6 +29,10 @@ function LandingPage() {
   );
 }
 
+/**
+ * App component defines the application's routing structure and global providers.
+ * Includes both public routes and protected clinical routes.
+ */
 function App() {
   return (
     <AuthProvider>
