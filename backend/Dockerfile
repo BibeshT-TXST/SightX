@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install only production dependencies for a lighter image
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Copy the rest of your backend source code
 COPY . .
