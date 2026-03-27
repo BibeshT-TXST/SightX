@@ -16,6 +16,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 
+/**
+ * LoginForm component handles the multi-step authentication process.
+ * Step 1: Email entry
+ * Step 2: Password entry with scanning animation
+ * 
+ * @param {Object} props
+ * @param {boolean} props.darkMode - Toggle between light and dark clinical themes
+ */
 export default function LoginForm({ darkMode = false }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +34,9 @@ export default function LoginForm({ darkMode = false }) {
 
   const [authError, setAuthError] = useState('');
 
+  /**
+   * Transitions to the password entry step.
+   */
   const handleContinue = (e) => {
     e.preventDefault();
     if (email.trim()) {
@@ -33,21 +44,25 @@ export default function LoginForm({ darkMode = false }) {
     }
   };
 
-  const handleLogin = async (e) => { // <-- MAKE THIS A ASYNC FUNCTION
+  /**
+   * Finalizes the login process with a simulated diagnostic scan.
+   */
+  const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError('');
     setIsScanning(true);
 
     try {
-      // 1. Attempt the real login
+      // Authenticate via Supabase Auth service
       await login(email, password);
 
-      // 2. Play the scanning animation slightly
+      // Simulate clinical credential verification scan
       setTimeout(async () => {
         setIsScanning(false);
         const { data: { user } } = await supabase.auth.getUser();
         const { data: currentProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
 
+        // Route based on clinical role
         if (currentProfile?.role === 'superuser') {
           navigate('/admin/create-user');
         } else {
@@ -55,7 +70,6 @@ export default function LoginForm({ darkMode = false }) {
         }
       }, 1500);
     } catch (err) {
-      // If Supabase rejects them (wrong password, etc.)
       setIsScanning(false);
       setAuthError(err.message);
     }

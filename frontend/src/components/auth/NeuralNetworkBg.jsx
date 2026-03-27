@@ -26,12 +26,18 @@ export default function NeuralNetworkBg({ darkMode = false }) {
     const CONNECTION_DIST = 140;
     const SPEED = 0.4;
 
+    /**
+     * Resizes the canvas to match the container's physical pixel density.
+     */
     const resize = () => {
       canvas.width = canvas.offsetWidth * window.devicePixelRatio;
       canvas.height = canvas.offsetHeight * window.devicePixelRatio;
       ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
     };
 
+    /**
+     * Generates the initial set of particles with random positions and velocities.
+     */
     const initParticles = () => {
       particles = [];
       const w = canvas.offsetWidth;
@@ -47,6 +53,9 @@ export default function NeuralNetworkBg({ darkMode = false }) {
       }
     };
 
+    /**
+     * Main animation loop: moves particles, draws connections, and clears the frame.
+     */
     const draw = () => {
       const w = canvas.offsetWidth;
       const h = canvas.offsetHeight;
