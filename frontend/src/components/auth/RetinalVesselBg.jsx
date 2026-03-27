@@ -4,6 +4,10 @@ import { Box } from '@mui/material';
  * Renders a subtle retinal vessel / fundus-inspired SVG pattern
  * as a background watermark for the login page.
  */
+/**
+ * RetinalVesselBg renders a stylized SVG watermark inspired by fundus photography.
+ * Used to provide a subtle medical-grade aesthetic to the login portal.
+ */
 export default function RetinalVesselBg() {
   return (
     <Box
@@ -26,12 +30,12 @@ export default function RetinalVesselBg() {
         xmlns="http://www.w3.org/2000/svg"
         style={{ overflow: 'visible' }}
       >
-        {/* Central optic disc */}
+        {/* ── Optic Disc (Central Anchor) ── */}
         <circle cx="400" cy="400" r="60" stroke="#0057c0" strokeWidth="1.5" opacity="0.6" />
         <circle cx="400" cy="400" r="45" stroke="#00685f" strokeWidth="1" opacity="0.4" />
         <circle cx="400" cy="400" r="28" fill="#0057c0" opacity="0.08" />
 
-        {/* Major vessel branches — superior */}
+        {/* ── Primary Vascular Arcades ── */}
         <path d="M400 340 Q380 280 340 200 Q320 160 280 100" stroke="#0057c0" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
         <path d="M400 340 Q430 270 480 190 Q510 140 540 80" stroke="#0057c0" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
 

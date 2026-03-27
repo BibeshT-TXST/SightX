@@ -2,6 +2,10 @@ import React from 'react';
 import { Box, Typography, Container, Grid, Paper, IconButton } from '@mui/material';
 import { CameraAlt, LibraryBooks, Security, HealthAndSafety, Biotech, ArrowForward } from '@mui/icons-material';
 
+/**
+ * BentoGrid component displays the core capabilities and development insights
+ * of the SightX project in a modern, responsive grid layout.
+ */
 const BentoGrid = () => {
   return (
     <Box component="section" sx={{ py: 12, bgcolor: 'custom.surface' }}>

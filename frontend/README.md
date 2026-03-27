@@ -1,16 +1,46 @@
-# React + Vite
+# SightX Professional Clinical Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The SightX frontend is a React application designed for retinal scan diagnostics. It prioritizes data integrity, visual excellence, and medical-grade reliability.
 
-Currently, two official plugins are available:
+## 🛠 Tech Stack
+- **Framework**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
+- **UI Components**: [Material UI (MUI)](https://mui.com/)
+- **State & Auth**: [Supabase](https://supabase.com/)
+- **Icons**: [MUI Icons](https://mui.com/material-ui/material-icons/)
+- **Typography**: [Inter](https://rsms.me/inter/) (Variable Typeface)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 📖 Developer Guidelines
 
-## React Compiler
+### Standard Operating Procedures (SOPs)
+- **Component Documentation**: Every component MUST include a JSDoc header describing its purpose and clinical context.
+- **Styling Architecture**: Use MUI's `sx` prop for component-level styling. Group properties logically (Layout → Spacing → Borders → Effects).
+- **Theming**: Adhere to the design tokens defined in `src/theme/index.js`. Use tonal layering and depth instead of harsh borders ("The No-Line Rule").
+- **Authentication**: Always use the `useAuth` hook for user state. Never bypass `ProtectedRoute` for clinical views.
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+### Do's ✅
+- **Use Semantic HTML**: Ensure all interactive elements have descriptive IDs for clinical audits and testing.
+- **Maintain Glassmorphism**: For deep-UI elements (like scan overlays), use `backdropFilter: 'blur(20px)'` with subtle opacities (`0.7` - `0.9`).
+- **One-Liner Comments**: Provide concise explanations for non-obvious clinical or scan logic.
 
-## Expanding the ESLint configuration
+### Don'ts ❌
+- **Ad-hoc CSS**: Avoid mixing vanilla CSS or external libraries unless explicitly required for specialized animations.
+- **Bypass Prop-Drilling**: Use the `AuthContext` or localized contexts for state management; avoid deep prop drilling in large layouts.
+- **Placeholders**: Never use placeholder images or text. Use the provided assets or generate appropriate clinical mockups.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🚀 Getting Started
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Environment Setup**:
+   Ensure `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are defined in your `.env`.
+
+3. **Launch Clinical Console**:
+   ```bash
+   npm run dev
+   ```
+
+---
+© 2026 SightX • Technical Documentation

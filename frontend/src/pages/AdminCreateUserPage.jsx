@@ -2,7 +2,22 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { 
+  Box, 
+  Typography, 
+  TextField, 
+  Button, 
+  Paper, 
+  MenuItem, 
+  Fade,
+  Alert
+} from '@mui/material';
 
+/**
+ * AdminCreateUserPage allows superusers to register new clinicians.
+ * Includes form validation and automatic sign-out after successful creation
+ * to allow the new user to sign in and verify their account.
+ */
 export default function AdminCreateUserPage() {
     const { logout, profile } = useAuth();
     const navigate = useNavigate();
@@ -10,16 +25,15 @@ export default function AdminCreateUserPage() {
     useEffect(() => {
         if (!profile || profile.role !== 'superuser') {
             navigate('/', { replace: true });
-            // 'replace: true' destroys the browser history
         }
     }, [profile, navigate]);
 
-    // Added role and clinicalUnit to our state
     const [formData, setFormData] = useState({
         email: '', password: '', firstName: '', lastName: '',
         practitionerId: '', role: 'clinician', clinicalUnit: ''
     });
     const [statusMsg, setStatusMsg] = useState('');
+    const [isError, setIsError] = useState(false);
 
     if (!profile || profile.role !== 'superuser') {
         return null;
@@ -28,6 +42,7 @@ export default function AdminCreateUserPage() {
     const handleCreate = async (e) => {
         e.preventDefault();
         setStatusMsg('Creating user...');
+        setIsError(false);
 
         const { error } = await supabase.auth.signUp({
             email: formData.email,
@@ -45,6 +60,7 @@ export default function AdminCreateUserPage() {
 
         if (error) {
             setStatusMsg(`Error: ${error.message}`);
+            setIsError(true);
             return;
         }
 
@@ -56,42 +72,95 @@ export default function AdminCreateUserPage() {
     };
 
     return (
-        <div style={{ padding: '2rem', display: 'flex', justifyContent: 'center' }}>
-            <div style={{ width: '100%', maxWidth: '400px' }}>
-                <h1>Register Clinician</h1>
-                <p style={{ marginBottom: '2rem' }}>Please fill out your details below.</p>
+        <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', minHeight: '80vh', alignItems: 'center' }}>
+            <Paper elevation={3} sx={{ p: 5, width: '100%', maxWidth: 480, borderRadius: '1.25rem' }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, mb: 1, color: 'primary.dark' }}>
+                    Register Clinician
+                </Typography>
+                <Typography sx={{ mb: 4, color: 'text.secondary' }}>
+                    Please fill out the clinical credentials below.
+                </Typography>
 
-                <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <input style={{ flex: 1 }} type="text" placeholder="First Name" onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} required />
-                        <input style={{ flex: 1 }} type="text" placeholder="Last Name" onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} required />
-                    </div>
+                <Box component="form" onSubmit={handleCreate} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <TextField 
+                            label="First Name" 
+                            fullWidth 
+                            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} 
+                            required 
+                        />
+                        <TextField 
+                            label="Last Name" 
+                            fullWidth 
+                            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} 
+                            required 
+                        />
+                    </Box>
 
-                    <input type="text" placeholder="Clinician ID" onChange={(e) => setFormData({ ...formData, practitionerId: e.target.value })} required />
-                    <input type="text" placeholder="Clinical Unit" onChange={(e) => setFormData({ ...formData, clinicalUnit: e.target.value })} required />
+                    <TextField 
+                        label="Clinician ID" 
+                        fullWidth 
+                        onChange={(e) => setFormData({ ...formData, practitionerId: e.target.value })} 
+                        required 
+                    />
+                    <TextField 
+                        label="Clinical Unit" 
+                        fullWidth 
+                        onChange={(e) => setFormData({ ...formData, clinicalUnit: e.target.value })} 
+                        required 
+                    />
 
-                    <select
-                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    <TextField
+                        select
+                        label="User Role"
                         value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                         required
-                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
                     >
-                        <option value="" disabled>Select User Role...</option>
-                        <option value="resident">Resident</option>
-                        <option value="fellow">Fellow</option>
-                        <option value="attending">Attending Physician</option>
-                    </select>
+                        <MenuItem value="resident">Resident</MenuItem>
+                        <MenuItem value="fellow">Fellow</MenuItem>
+                        <MenuItem value="attending">Attending Physician</MenuItem>
+                    </TextField>
 
-                    <input type="email" placeholder="Login Email" onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
-                    <input type="password" placeholder="Password" onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+                    <TextField 
+                        type="email" 
+                        label="Login Email" 
+                        fullWidth 
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                        required 
+                    />
+                    <TextField 
+                        type="password" 
+                        label="Password" 
+                        fullWidth 
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })} 
+                        required 
+                    />
 
-                    <button type="submit" style={{ padding: '10px', marginTop: '10px', backgroundColor: '#0057c0', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                    <Button 
+                        type="submit" 
+                        variant="contained" 
+                        sx={{ 
+                            py: 1.5, 
+                            mt: 2, 
+                            fontWeight: 700,
+                            background: 'linear-gradient(90deg, #0057c0 0%, #006ff0 100%)',
+                            borderRadius: '0.75rem'
+                        }}
+                    >
                         Create User & Sign Out
-                    </button>
-                </form>
-                <p style={{ marginTop: '1rem', fontWeight: 'bold' }}>{statusMsg}</p>
-            </div>
-        </div>
+                    </Button>
+                </Box>
+
+                {statusMsg && (
+                    <Fade in={!!statusMsg}>
+                        <Alert severity={isError ? "error" : "success"} sx={{ mt: 3, borderRadius: '0.75rem' }}>
+                            {statusMsg}
+                        </Alert>
+                    </Fade>
+                )}
+            </Paper>
+        </Box>
     )
 }
 

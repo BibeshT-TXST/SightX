@@ -3,6 +3,10 @@ import PolicyIcon from '@mui/icons-material/Policy';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DashboardLayout from '../components/layout/DashboardLayout';
 
+/**
+ * LegalsPage contains the mandatory clinical disclaimers, data privacy policies,
+ * and service guidelines for the SightX platform.
+ */
 export default function LegalsPage() {
   return (
     <DashboardLayout>

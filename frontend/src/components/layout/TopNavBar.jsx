@@ -2,6 +2,10 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, Box, Button, Chip } from '@mui/material';
 import logo from '../../assets/logo.png';
 
+/**
+ * TopNavBar component provides the global navigation bar for the public landing pages.
+ * Features a blurred glassmorphism effect and the SightX branding.
+ */
 const TopNavBar = () => {
   return (
     <AppBar

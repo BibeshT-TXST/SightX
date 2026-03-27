@@ -1,4 +1,7 @@
-# Dependencies for the inference-engine project
+# ── SightX Inference Engine: Core Dependencies ──
+# ─────────────────────────────────────────────
+# This file defines the clinical-grade toolset required for 
+# ResNet-50 inference and image processing orchestration.
 torch
 torchvision
 Pillow

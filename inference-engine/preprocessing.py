@@ -1,31 +1,20 @@
-# ──────────────────────────────────────────────────────────────────────────────
-# Image pipelines for preprocessing and postprocessing — V2
-# ──────────────────────────────────────────────────────────────────────────────
-# V2 Changes (based on Kaggle winning solutions):
-#   - 384×384 resolution (up from 224) — more detail for the model
-#   - 360° rotation (up from ±10°) — retinas can be imaged at any angle
-#   - Added vertical flip, stronger color jitter, GaussianBlur, RandomErasing
-#   - RandomResizedCrop instead of plain Resize for scale invariance
-# ──────────────────────────────────────────────────────────────────────────────
+"""
+Inference & Augmentation Pipelines — SightX
+
+Handles image normalization, training-time augmentation, and 
+Test-Time Augmentation (TTA) for robust retinal diagnostics.
+"""
 
 import logging
 from torchvision import transforms
 from PIL import Image
 import torch
 
-# ImageNet statistics (required for ResNet50 pre-trained weights)
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD  = [0.229, 0.224, 0.225]
-
-# V2 image resolution — competition winners used 384–1024px
-# 384 is the sweet spot: significant detail improvement vs 224, but still
-# trainable on M4 in reasonable time (~25-30 min/epoch)
+# Clinical-grade image resolution and ImageNet normalization tokens
+IMAGENET_MEAN, IMAGENET_STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
 IMG_SIZE = 384
 
-# ── Training Transforms (V2: Aggressive Augmentation) ────────────────────────
-# Kaggle winners used full 360° rotation, heavy color jitter, and random 
-# cropping. This forces the model to generalize instead of memorizing.
-# V1 overfitted after Epoch 7 — strong augmentation directly fights this.
+# ── Training Transforms: Aggressive augmentation for generalization ──
 
 train_transforms = transforms.Compose([
     # Scale-aware cropping: randomly zoom into 85-100% of the image
@@ -62,19 +51,15 @@ train_transforms = transforms.Compose([
     transforms.RandomErasing(p=0.2, scale=(0.02, 0.1)),
 ])
 
-# ── Inference Transforms (V2: Matched Resolution) ────────────────────────────
-# Deterministic — no randomness during evaluation/inference
-# Resolution must match training resolution (384px)
+# ── Inference Transforms: Deterministic evaluation ──
 inference_transforms = transforms.Compose([
-    transforms.Resize(int(IMG_SIZE * 1.15)),  # Scale shorter edge to ~442px
-    transforms.CenterCrop(IMG_SIZE),          # Center crop to 384×384
+    transforms.Resize(int(IMG_SIZE * 1.15)),  
+    transforms.CenterCrop(IMG_SIZE),          
     transforms.ToTensor(),
     transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
 ])
 
-# ── Test-Time Augmentation (TTA) Transforms ──────────────────────────────────
-# Used during the 108-iteration ensemble loop to create slightly perturbed
-# views of the same retina, improving robustness and capturing uncertainty.
+# ── TTA Transforms: Stochastic perturbation for robust ensembles ──
 tta_transforms = transforms.Compose([
     transforms.Resize(int(IMG_SIZE * 1.15)),
     transforms.RandomCrop(IMG_SIZE),          # Randomly crop instead of CenterCrop

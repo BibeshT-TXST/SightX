@@ -1,4 +1,5 @@
 services:
+  # ── User Interface: Clinical Diagnostic Portal ──
   frontend:
     image: sightx-frontend:latest
     container_name: sightx-frontend
@@ -15,6 +16,7 @@ services:
       - backend
       - inference-engine
 
+  # ── Middleware: API Gateway & Orchestration ──
   backend:
     image: sightx-backend:latest
     container_name: sightx-backend
@@ -29,6 +31,7 @@ services:
       - INFERENCE_ENGINE_URL=http://inference-engine:8000
     restart: unless-stopped
 
+  # ── Core Inference: AI Diagnostic Engine ──
   inference-engine:
     image: sightx-inference:latest
     container_name: sightx-inference
