@@ -1,6 +1,7 @@
 # SightX: Diabetic Retinopathy Detection System
 
-> **Preventing blindness through AI.** SightX is a clinical diagnostic platform that leverages deep learning to enable early screening for Diabetic Retinopathy.
+## Preventing blindness through AI
+SightX is a clinical diagnostic platform that leverages deep learning to enable early screening for Diabetic Retinopathy.
 
 ---
 
@@ -20,6 +21,9 @@ SightX is built as a highly-decoupled microservices stack, ensuring scalability 
 | **Backend** | API Orchestration & Gateway | Node.js, Express, Multer | [View README](./backend/README.md) |
 | **Inference Engine** | ResNet AI & Clinical Post-processing | PyTorch, FastAPI, NumPy | [View README](./inference-engine/README.md) |
 
+> [!TIP]
+> **View Systems Design**: For a detailed visual breakdown of the microservices and data flows, see [SYSTEMS_DESIGN.md](./SYSTEMS_DESIGN.md).
+
 ---
 
 ## 🌟 Technical Highlights
@@ -31,6 +35,20 @@ SightX is built as a highly-decoupled microservices stack, ensuring scalability 
 ### 2. Clinical UI
 - **The "No-Line" Rule**: A design philosophy utilizing tonal layering and depth instead of harsh borders.
 - **Clinical Aesthetics**: Glassmorphism and high-performance animations tailored for medical environments.
+
+---
+
+## 📋 Prerequisites
+
+Before launching the SightX stack, ensure you have the following installed:
+
+1. **Docker & Docker Compose**: (Required for Orchestration)
+   - [Install Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Compose).
+2. **Supabase Account**: (Required for Persistence)
+   - [Sign up for free](https://supabase.com/dashboard/sign-up).
+3. **Local Dev Tools** (Optional - only if running services individually):
+   - **Node.js 18+**: For Frontend and Backend.
+   - **Python 3.10+**: For the Inference Engine.
 
 ---
 
