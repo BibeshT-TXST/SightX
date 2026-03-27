@@ -1,6 +1,7 @@
 # SightX: Diabetic Retinopathy Detection System
 
-> **Preventing blindness through AI.** SightX is a clinical diagnostic platform that leverages deep learning to enable early screening for Diabetic Retinopathy.
+## Preventing blindness through AI
+SightX is a clinical diagnostic platform that leverages deep learning to enable early screening for Diabetic Retinopathy.
 
 ---
 
