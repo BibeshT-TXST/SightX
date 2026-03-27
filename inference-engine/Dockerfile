@@ -1,6 +1,6 @@
 # Use official Python lightweight image
 # ARM64 architecture as per original Dockerfile (runs well on M-series Macs or AWS Graviton)
-FROM --platform=arm64 python:3.10-slim-bookworm
+FROM python:3.10-slim-bookworm
 
 # Set the working directory
 WORKDIR /app

@@ -1,5 +1,5 @@
 # Use the official Node.js 20 image (LTS)
-FROM --platform=arm64 node:20-alpine
+FROM node:20-alpine
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
