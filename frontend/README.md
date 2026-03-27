@@ -1,6 +1,6 @@
 # SightX Professional Clinical Frontend
 
-The SightX frontend is a high-performance, clinical-grade React application designed for retinal scan diagnostics. It prioritizes data integrity, visual excellence, and medical-grade reliability.
+The SightX frontend is a React application designed for retinal scan diagnostics. It prioritizes data integrity, visual excellence, and medical-grade reliability.
 
 ## 🛠 Tech Stack
 - **Framework**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
@@ -43,4 +43,4 @@ The SightX frontend is a high-performance, clinical-grade React application desi
    ```
 
 ---
-© 2026 SightX Clinical Systems • Technical Documentation
+© 2026 SightX • Technical Documentation

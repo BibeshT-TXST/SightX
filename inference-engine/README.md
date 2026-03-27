@@ -1,6 +1,6 @@
 # SightX Inference Engine (V2)
 
-The SightX Inference Engine is a high-performance clinical diagnostic service. It uses a custom ResNet-50 V2 architecture to grade Diabetic Retinopathy (DR) severity from retinal fundus photographs.
+The SightX Inference Engine is a clinical diagnostic service. It uses a custom ResNet-50 V2 architecture to grade Diabetic Retinopathy (DR) severity from retinal fundus photographs.
 
 ## 🚀 Advanced Inference Strategy
 - **Monte-Carlo TTA Ensemble**: Each prediction runs through a 108-iteration Test-Time Augmentation loop to ensure robustness and capture epistemic uncertainty.

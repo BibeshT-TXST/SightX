@@ -1,58 +1,73 @@
-# SightX
-AI-powered diabetic retinopathy detection system using transfer learning (ResNet50) to enable early screening and prevent blindness. Built with React, Node.js, PostgreSQL, and PyTorch. A personal mission to combine my passion for biology and technology while honoring my family's journey with diabetes.
+# SightX: Diabetic Retinopathy Detection System
 
-## The Story Behind This Project
-Diabetes runs in my family. I've watched my relatives navigate the challenges of this disease, including the constant worry about complications like diabetic retinopathy—a leading cause of blindness that often shows no symptoms until it's too late.
+> **Preventing blindness through AI.** SightX is a clinical diagnostic platform that leverages deep learning to enable early screening for Diabetic Retinopathy.
 
-As a software engineer with a deep fascination for biology, I've always dreamed of working at the intersection of healthcare and technology. This project represents that convergence: applying my fullstack development skills and diving deep into machine learning to build something that could genuinely help people.
+---
 
-## Project Goals
+## 🔬 The SightX Story
+Diabetes is a global challenge, and Diabetic Retinopathy remains a leading cause of preventable blindness. For many, the first symptom is permanent vision loss. **SightX was built with a personal mission:** to bridge the gap between advanced medical AI and the patients who need it most, honoring a family journey with diabetes.
 
-### Technical Objectives
-- **Understand Transfer Learning**: Apply ResNet50 (pre-trained on ImageNet) with custom classification head for medical image analysis
-- **Refine Fullstack Architecture**: Build a microservices system with React, Node.js, PostgreSQL, and FastAPI
-- **Optimize for M4 Neural Engine**: Leverage Apple Silicon for accelerated inference pipelines
-- **Deployment**: Containerize with Docker and design for scalability
+By combining a **ResNet-50 V2** backbone with Bayesian decision theory and a "No-Line" clinical UI, SightX provides a robust, safe, and beautiful screening experience.
 
-### Impact Objectives
-- **Serve Underserved Communities**: Bring diagnostic tools to rural areas lacking eye care specialists  
-- **Early Detection**: Catch diabetic retinopathy at mild stages (Grade 1-2) before irreversible damage
-- **Reduce Healthcare Burden**: Automate initial screening to reserve specialist time for high-risk cases
-- **Democratize Screening**: Enable primary care clinics to perform DR screening without specialized ophthalmologists
+---
 
-## System Architecture
-```
-┌─────────────┐      ┌──────────────┐      ┌─────────────────┐      ┌──────────────┐
-│    React    │ ───> │   Node.js    │ ───> │ Python FastAPI  │ ───> │  PostgreSQL  │
-│  Frontend   │ <─── │   Backend    │ <─── │  ML Inference   │ <─── │   Database   │
-│             │      │              │      │   (ResNet50)    │      │   (Records)  │
-└─────────────┘      └──────────────┘      └─────────────────┘      └──────────────┘
-```
+## 🏗 System Architecture
+SightX is built as a highly-decoupled microservices stack, ensuring scalability and clinical reliability.
 
-## Why This Matters
+| Component | Responsibility | Tech Stack | Documentation |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | Clinical Interface & User Flow | React, MUI, Vite | [View README](./frontend/README.md) |
+| **Backend** | API Orchestration & Gateway | Node.js, Express, Multer | [View README](./backend/README.md) |
+| **Inference Engine** | ResNet AI & Clinical Post-processing | PyTorch, FastAPI, NumPy | [View README](./inference-engine/README.md) |
 
-**The Problem:**
-- 463 million people worldwide have diabetes
-- 1 in 3 will develop diabetic retinopathy
-- Most won't know until vision loss is permanent
-- Shortage of ophthalmologists, especially in rural areas
+---
 
-**The Solution:**
-- Automated screening at primary care level
-- Scalable to underserved regions
-- Early detection when treatment is most effective
-- Cost reduction vs treating advanced blindness
+## 🌟 Technical Highlights
+### 1. Clinical-Grade AI Safety
+- **108-Iteration TTA Ensemble**: Robustness against camera artifacts using Test-Time Augmentation.
+- **Bayesian Prior Correction**: Adjusts for training-set bias (EyePACS) to reflect real-world clinical prevalence.
+- **Risk-Minimized Decisions**: Uses an asymmetric cost matrix to prioritize patient safety over raw accuracy.
 
-## Personal Note
+### 2. Clinical UI
+- **The "No-Line" Rule**: A design philosophy utilizing tonal layering and depth instead of harsh borders.
+- **Clinical Aesthetics**: Glassmorphism and high-performance animations tailored for medical environments.
 
-This project represents the intersection of everything I care about: my family's health, my love for biology, and my skills as a software engineer. Every line of code is written with the hope that one day, technology like this could help someone keep their sight. 
+---
 
-There is a dedicated blog tied to the project if you want to see details of how I am building my project and participate in discussions.
+## 🚀 Quick Start (Orchestration)
+The entire SightX stack is containerized for professional deployment.
 
-If you're a healthcare professional, ML researcher, or just someone who believes in using technology for good. I would love to hear your feedback.
+1. **Environment Config**: Ensure your `.env` contains the required Supabase and AI engine tokens.
+2. **Launch Stack**:
+   ```bash
+   docker-compose up --build
+   ```
+3. **Internal Access**:
+   - Frontend: `http://localhost:80`
+   - Backend API: `http://localhost:5001`
+   - Inference Engine: `http://localhost:8000`
 
-**Built with care and to serve people by Bibesh Timalsina**  
-Software Engineer | Advocate for Health Tech | Biology Enthusiast 
+## 🩺 Clinical Operating Mandate
 
-## License
-MIT License - feel free to use this for learning, research, or building upon.
+### 1. Optical Hardware Requirements
+SightX is optimized for high-resolution retinal imaging. To ensure diagnostic accuracy, images **must** be captured using professional **Digital Fundus Cameras**:
+- **Field of View (FOV)**: Minimum 45° horizontal (non-mydriatic preferred).
+- **Resolution**: Minimum 30 pixels per degree (ppd).
+- **Standards**: Images should ideally be DICOM-compliant with unique patient identifiers at the point of capture.
+- **Environment**: Controlled lighting to minimize artifacts and lens flare.
+
+### 2. Governance & Data Sovereignty
+SightX is designed for institutional deployment and adheres to strict clinical governance:
+- **Environment**: Must operate exclusively within **Hospital/Clinical Environments** under direct supervision of medical authorities.
+- **User Roles**: Intended for use by **Verified Clinicians** and **Medical Residents**.
+- **Regulatory (HIPAA/GDPR)**: For real-world patient data, SightX requires a **Supabase B2B/Enterprise Plan**.
+    - **Isolated Infrastructure**: Each institution must host a separate, sovereign database instance.
+    - **Encryption**: Enterprise-grade encryption at rest and in transit is mandatory for HPI (Health Protected Information).
+
+---
+
+> [!IMPORTANT]
+> **Clinical Disclaimer**: SightX is currently a research and educational project. It is intended to demonstrate the potential of AI in telemedicine and should not be used as a primary diagnostic tool without clinical validation and institutional approval.
+
+---
+**Built with care to serve people**
