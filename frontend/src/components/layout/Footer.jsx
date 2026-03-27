@@ -2,6 +2,10 @@ import React from 'react';
 import { Box, Typography, Container, Grid, Link } from '@mui/material';
 import { Info, Lock } from '@mui/icons-material';
 
+/**
+ * Footer component displays the global mission statement, ethical engineering
+ * disclosures, and project links.
+ */
 const Footer = () => {
   return (
     <Box component="footer" sx={{ bgcolor: 'custom.surface', py: 10, borderTop: '1px solid', borderColor: 'custom.surfaceContainerHigh' }}>

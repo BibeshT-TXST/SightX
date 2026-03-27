@@ -28,11 +28,22 @@ const navLinkBase = {
   transition: 'all 0.3s ease',
 };
 
+/**
+ * DashboardLayout component provides the primary authenticated shell for the application.
+ * Includes a responsive sidebar, a sticky header with user profile, and a content area
+ * with smooth page transitions.
+ * 
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Inner page content to be rendered.
+ */
 export default function DashboardLayout({ children }) {
   const { logout, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  /**
+   * Performs the sign-out operation and redirects to the landing page.
+   */
   const handleSignOut = () => {
     logout();
     navigate('/');
