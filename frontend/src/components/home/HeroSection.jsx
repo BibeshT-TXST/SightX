@@ -4,6 +4,10 @@ import { Box, Typography, Button, Container, Grid, Chip } from '@mui/material';
 import { School, Lock, Analytics } from '@mui/icons-material';
 import logo from '../../assets/logo.png';
 
+/**
+ * HeroSection component serves as the landing page's primary introduction.
+ * Highlights the project's clinical focus and research metrics for medical residents.
+ */
 const HeroSection = () => {
   return (
     <Box component="section" sx={{ position: 'relative', minHeight: '850px', display: 'flex', alignItems: 'center', overflow: 'hidden', py: 10 }}>
