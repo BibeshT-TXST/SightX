@@ -1,3 +1,9 @@
+/**
+ * SightX MUI Theme Configuration.
+ * Defines the clinical design system, including custom color tokens,
+ * typography scales based on the "Inter" typeface, and component-level overrides
+ * for a premium, hospital-grade aesthetic.
+ */
 import { createTheme } from '@mui/material/styles';
 
 const customColors = {
