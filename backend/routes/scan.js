@@ -19,8 +19,9 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     });
 
     // 2. Forward the image to the Python FastAPI engine
-    // Make sure the Python engine is running on port 8000!
-    const inferenceResponse = await axios.post('http://localhost:8000/predict', formData, {
+    // Dynamically use the internal Docker service URL
+    const inferenceUrl = process.env.INFERENCE_ENGINE_URL || 'http://inference-engine:8000';
+    const inferenceResponse = await axios.post(`${inferenceUrl}/predict`, formData, {
       headers: { ...formData.getHeaders() }
     });
 
