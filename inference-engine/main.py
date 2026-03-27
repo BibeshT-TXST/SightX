@@ -1,25 +1,9 @@
-# ──────────────────────────────────────────────────────────────────────────────
-# SightX Inference Engine — FastAPI Server
-# ──────────────────────────────────────────────────────────────────────────────
-# This module exposes a REST API for real-time Diabetic Retinopathy (DR)
-# grading.  A client uploads a retinal fundus photograph and receives back
-# the predicted severity grade (0–4) together with a confidence score.
-#
-# Architecture overview:
-#   1. On startup the trained DRClassifier (ResNet-50 V2) and its best
-#      checkpoint are loaded into memory *once* so that every request
-#      benefits from a warm model.
-#   2. The single POST endpoint `/predict` accepts a JPEG/PNG upload,
-#      runs it through the V2 inference preprocessing pipeline, feeds
-#      it to the model, and returns a JSON response.
-#
-# Dependencies:
-#   - FastAPI + Uvicorn   (web server)
-#   - PyTorch             (inference runtime)
-#   - Pillow              (image I/O)
-#   - model.py            (DRClassifier architecture)
-#   - preprocessing.py    (preprocess_image helper)
-# ──────────────────────────────────────────────────────────────────────────────
+"""
+SightX Inference Engine — FastAPI Server
+
+This module exposes a REST API for real-time Diabetic Retinopathy (DR) 
+grading using a trained ResNet-50 V2 model.
+"""
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
@@ -27,6 +11,7 @@ import torch
 import io
 import time
 from PIL import Image
+from collections import Counter
 
 # Local project modules
 from model import DRClassifier
@@ -52,22 +37,14 @@ elif torch.backends.mps.is_available():
 else:
     DEVICE = torch.device('cpu')
 
-# Instantiate the same architecture used during training (5 DR grades).
+# ── Model Initialization ──
 model = DRClassifier(num_classes=5)
 
-# Load the saved weights from the best training checkpoint.
-# `map_location` ensures weights are mapped to the current device even if
-# the checkpoint was saved on a different one (e.g., trained on MPS but
-# deployed on CPU).
-model.load_state_dict(torch.load('checkpoints/best_model.pt',map_location=DEVICE))
+# Load weights and map to the designated accelerator (CUDA, MPS, or CPU)
+model.load_state_dict(torch.load('checkpoints/best_model.pt', map_location=DEVICE))
 
-# Switch to evaluation mode:
-#   • Disables dropout (all neurons active → deterministic output)
-#   • Fixes BatchNorm running statistics (uses training-set mean/var)
-# This is *required* for reproducible, stable predictions.
+# Evaluation mode: Disables dropout and stabilizes BatchNorm
 model.eval()
-
-# Move model parameters to the target device for inference.
 model.to(DEVICE)
 
 
@@ -134,37 +111,25 @@ async def predict(file: UploadFile = File(...)):
     # ── 3. Base Image Loaded ─────────────────────────────────────────────
     # We will apply transforms uniquely inside the 108 loop for Test-Time Augmentation.
 
-    # ── 4. Run TTA inference 108 times (no gradient computation) ─────────────
-    from collections import Counter
-    
+    # ── 4. Test-Time Augmentation (TTA) Ensemble ──
     total_time_ms = 0
-    all_raw_grades = []
-    all_confidences = []
+    all_raw_grades, all_confidences = [], []
     final_result = None
 
-    # `torch.no_grad()` disables the autograd engine to reduce memory and speed up forward passes.
     with torch.no_grad():
         for i in range(108):
             iter_start = time.time()
             
-            # Use deterministic transform for the very first pass to anchor the main result,
-            # use TTA for the other 107 passes to build the ensemble distribution.
-            if i == 0:
-                tensor = inference_transforms(image).unsqueeze(0).to(DEVICE)
-            else:
-                tensor = tta_transforms(image).unsqueeze(0).to(DEVICE)
+            # i=0: Anchor pass (deterministic); i>0: TTA passes (stochastic)
+            tensor = (inference_transforms(image) if i == 0 else tta_transforms(image)).unsqueeze(0).to(DEVICE)
             
             logits = model(tensor)
-            logits_np = logits.cpu().numpy().flatten()
+            result = classify_clinical_tier(logits.cpu().numpy().flatten(), prior_mode='clinical')
             
-            result = classify_clinical_tier(logits_np, prior_mode='clinical')
-            
-            iter_end = time.time()
-            total_time_ms += (iter_end - iter_start) * 1000
-            
+            total_time_ms += (time.time() - iter_start) * 1000
             all_raw_grades.append(result['raw_grade'])
             all_confidences.append(result['confidence'])
-            final_result = result # Keep the last one for detailed probs
+            final_result = result
 
     # ── 5. Calculate Ensembled Metrics ───────────────────────────────────
     avg_inference_time_ms = total_time_ms / 108.0

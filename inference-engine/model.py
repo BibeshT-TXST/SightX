@@ -1,12 +1,9 @@
-# ──────────────────────────────────────────────────────────────────────────────
-# Model Architecture — V2
-# ──────────────────────────────────────────────────────────────────────────────
-# V2 Changes:
-#   - Deeper classifier head: 2048 → 512 → 128 → 5 (was 2048 → 512 → 5)
-#   - Added BatchNorm for training stability
-#   - Added gradual unfreezing support (unfreeze_layer3 method)
-#   - Slightly reduced dropout (0.4 vs 0.5) since V2 has stronger augmentation
-# ──────────────────────────────────────────────────────────────────────────────
+"""
+Model Architecture — SightX DRClassifier (V2)
+
+ResNet-50 backbone with a multi-stage fully-connected classifier head, 
+designed for clinical-grade retinal scan grading.
+"""
 
 import torch
 import torch.nn as nn
@@ -33,15 +30,7 @@ class DRClassifier(nn.Module):
             param.requires_grad = True
 
         # ── V2 Classifier Head ────────────────────────────────────────────
-        # Deeper head with BatchNorm for training stability.
-        # V1 had: Linear(2048→512) → ReLU → Dropout(0.5) → Linear(512→5)
-        # V2 has: Linear(2048→512) → BN → ReLU → Drop(0.4)
-        #       → Linear(512→128)  → BN → ReLU → Drop(0.3)
-        #       → Linear(128→5)
-        #
-        # BatchNorm normalizes activations between layers, which stabilizes
-        # gradients and lets us use a slightly higher learning rate.
-        # The extra hidden layer gives more capacity to separate 5 grades.
+        # multi-stage head with BatchNorm for gradient stability
         in_features = self.backbone.fc.in_features  # 2048
         self.backbone.fc = nn.Sequential(
             nn.Linear(in_features, 512),
@@ -64,16 +53,7 @@ class DRClassifier(nn.Module):
         return torch.softmax(logits, dim=1)
 
     def unfreeze_layer3(self):
-        """
-        Gradual unfreezing: unlock layer3 for fine-tuning.
-        
-        Call this after a few epochs of training. Initially only layer4 + head
-        are trainable. Unfreezing layer3 lets the model adapt earlier features
-        to retinal images, but only after the head and layer4 have stabilized.
-        
-        This technique prevents early overfitting while allowing deeper 
-        fine-tuning later when the model needs it.
-        """
+        """Unlock early feature layers for deep fine-tuning."""
         for param in self.backbone.layer3.parameters():
             param.requires_grad = True
         print("  → Layer 3 unfrozen for fine-tuning")
