@@ -20,6 +20,9 @@ SightX is built as a highly-decoupled microservices stack, ensuring scalability 
 | **Backend** | API Orchestration & Gateway | Node.js, Express, Multer | [View README](./backend/README.md) |
 | **Inference Engine** | ResNet AI & Clinical Post-processing | PyTorch, FastAPI, NumPy | [View README](./inference-engine/README.md) |
 
+> [!TIP]
+> **View Systems Design**: For a detailed visual breakdown of the microservices and data flows, see [SYSTEMS_DESIGN.md](./SYSTEMS_DESIGN.md).
+
 ---
 
 ## 🌟 Technical Highlights
