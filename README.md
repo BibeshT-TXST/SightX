@@ -34,6 +34,20 @@ SightX is built as a highly-decoupled microservices stack, ensuring scalability 
 
 ---
 
+## 📋 Prerequisites
+
+Before launching the SightX stack, ensure you have the following installed:
+
+1. **Docker & Docker Compose**: (Required for Orchestration)
+   - [Install Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Compose).
+2. **Supabase Account**: (Required for Persistence)
+   - [Sign up for free](https://supabase.com/dashboard/sign-up).
+3. **Local Dev Tools** (Optional - only if running services individually):
+   - **Node.js 18+**: For Frontend and Backend.
+   - **Python 3.10+**: For the Inference Engine.
+
+---
+
 ## 🚀 Quick Start (Orchestration)
 The entire SightX stack is containerized for professional deployment.
 
