@@ -38,13 +38,19 @@ from clinical_postprocessor import classify_clinical_tier, GRADE_TO_TIER, TIER_L
 app = FastAPI(title='SightX Inference Engine', version='1.0')
 
 
-# ── Startup: Load Model Once Into Memory ─────────────────────────────────────
 # Selecting the best available hardware accelerator:
+#   • NVIDIA GPU    → 'cuda' (CUDA Toolkit)
 #   • Apple Silicon → 'mps'  (Metal Performance Shaders)
-#   • Otherwise     → 'gpu'  (CUDA) if available, else 'cpu'
-# Note: CUDA is not listed here because the target deployment environment
-# is an Apple-silicon Mac.  Add a CUDA check if deploying to a GPU server.
-DEVICE = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+#   • Otherwise     → 'cpu'  (Standard fallback)
+#
+# This ensures the 9GB container actually utilizes your hardware 
+# on Windows, Linux, or Mac without any code changes.
+if torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+elif torch.backends.mps.is_available():
+    DEVICE = torch.device('mps')
+else:
+    DEVICE = torch.device('cpu')
 
 # Instantiate the same architecture used during training (5 DR grades).
 model = DRClassifier(num_classes=5)

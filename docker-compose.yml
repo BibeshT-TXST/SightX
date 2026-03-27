@@ -1,0 +1,42 @@
+services:
+  frontend:
+    image: sightx-frontend:latest
+    container_name: sightx-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - inference-engine
+
+  backend:
+    image: sightx-backend:latest
+    container_name: sightx-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"
+    env_file:
+      - .env
+    environment:
+      - INFERENCE_ENGINE_URL=http://inference-engine:8000
+    restart: unless-stopped
+
+  inference-engine:
+    image: sightx-inference:latest
+    container_name: sightx-inference
+    build:
+      context: ./inference-engine
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
