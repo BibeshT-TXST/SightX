@@ -1,15 +1,15 @@
 {
-  "name": "backend",
+  "name": "sightx-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Secure Node.js middleware for retinal scan orchestration and AI inference.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["retinal-scan", "ai", "telemedicine", "fastapi-bridge"],
+  "author": "SightX Clinical Team",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
