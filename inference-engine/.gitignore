@@ -2,7 +2,7 @@
 data/
 
 # Ignore trained model checkpoints
-checkpoints/
+# checkpoints/
 
 # Ignore Python cache and environment
 __pycache__/
