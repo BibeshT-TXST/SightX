@@ -21,4 +21,3 @@ __pycache__/
 
 # Custom Exclusions
 inference-engine/data/
-inference-engine/checkpoints/
