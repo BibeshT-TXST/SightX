@@ -1,10 +1,5 @@
 # SightX: Diabetic Retinopathy Detection System
 
-## Preventing blindness through AI
-SightX is a clinical diagnostic platform that leverages deep learning to enable early screening for Diabetic Retinopathy.
-
----
-
 ## 🔬 The SightX Story
 Diabetes is a global challenge, and Diabetic Retinopathy remains a leading cause of preventable blindness. For many, the first symptom is permanent vision loss. **SightX was built with a personal mission:** to bridge the gap between advanced medical AI and the patients who need it most, honoring a family journey with diabetes.
 
@@ -15,14 +10,13 @@ By combining a **ResNet-50 V2** backbone with Bayesian decision theory and a "No
 ## 🏗 System Architecture
 SightX is built as a highly-decoupled microservices stack, ensuring scalability and clinical reliability.
 
+![System Architecture](./Docs/SightX.png)
+
 | Component | Responsibility | Tech Stack | Documentation |
 | :--- | :--- | :--- | :--- |
 | **Frontend** | Clinical Interface & User Flow | React, MUI, Vite | [View README](./frontend/README.md) |
 | **Backend** | API Orchestration & Gateway | Node.js, Express, Multer | [View README](./backend/README.md) |
 | **Inference Engine** | ResNet AI & Clinical Post-processing | PyTorch, FastAPI, NumPy | [View README](./inference-engine/README.md) |
-
-> [!TIP]
-> **View Systems Design**: For a detailed visual breakdown of the microservices and data flows, see [SYSTEMS_DESIGN.md](./SYSTEMS_DESIGN.md).
 
 ---
 
