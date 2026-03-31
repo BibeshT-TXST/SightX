@@ -155,18 +155,35 @@ export default function DashboardLayout({ children }) {
           </Box>
 
           {/* Bottom Actions */}
-          <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'rgba(226,232,240,0.6)' }}>
+          <Box sx={{ pt: 2, borderTop: '1px solid #f1f5f9' }}>
             <Box
               onClick={handleSignOut}
               sx={{
-                ...navLinkBase,
-                mt: 2,
-                color: '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1,
+                px: 2,
+                py: 1.5,
+                mt: 1,
+                borderRadius: '0.75rem',
                 cursor: 'pointer',
-                '&:hover': { color: '#dc2626', bgcolor: 'rgba(220,38,38,0.06)' },
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: '#94a3b8',
+                bgcolor: 'transparent',
+                border: '1px solid #f1f5f9',
+                transition: 'all 0.25s ease',
+                '&:hover': {
+                  color: '#dc2626',
+                  bgcolor: 'rgba(220,38,38,0.06)',
+                  borderColor: 'rgba(220,38,38,0.15)',
+                  boxShadow: '0 2px 8px rgba(220,38,38,0.08)',
+                },
+                '&:active': { transform: 'scale(0.97)' },
               }}
             >
-              <LogoutIcon fontSize="small" />
+              <LogoutIcon sx={{ fontSize: 16 }} />
               <span>Sign Out</span>
             </Box>
           </Box>
