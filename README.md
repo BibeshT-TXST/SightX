@@ -8,9 +8,13 @@ By combining a **ResNet-50 V2** backbone with Bayesian decision theory and a "No
 ---
 
 ## 🏗 System Architecture
+
 SightX is built as a highly-decoupled microservices stack, ensuring scalability and clinical reliability.
 
 ![System Architecture](./Docs/SightX.png)
+
+**📖 [Read the Detailed System Design & Architecture Document ➔](./SYSTEM_DESIGN.md)**  
+*(Includes details on our RHEL institutional deployment model, security flow, and data lifecycles).*
 
 | Component | Responsibility | Tech Stack | Documentation |
 | :--- | :--- | :--- | :--- |
