@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files first to leverage Docker cache
 COPY package.json package-lock.json ./
-RUN npm install --no-audit --no-fund
+RUN npm ci --include=dev
 
 # Copy the rest of the app source code
 COPY . .
