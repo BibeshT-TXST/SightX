@@ -1,0 +1,76 @@
+name: SightX CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Concurrency limits to cancel redundant runs if new commits are pushed to the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-check:
+    name: Frontend (React) Compatibility
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+      
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Verify Build
+        run: npm run build
+
+  backend-check:
+    name: Backend (Express) Compatibility
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './backend/package-lock.json'
+      
+      - name: Install Dependencies
+        run: npm ci
+        
+      - name: Syntax Check Gateway
+        run: node -c index.js
+
+  inference-check:
+    name: Inference (FastAPI/PyTorch) Compatibility
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./inference-engine
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install Dependencies
+        # Using a caching mechanism via setup-python to keep things blazing fast
+        run: pip install -r requirements.txt
+        
+      - name: Syntax Check Model API
+        run: python -m py_compile main.py
