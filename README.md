@@ -1,4 +1,5 @@
 # SightX: Diabetic Retinopathy Detection System
+### Live Demo: [Click Here](https://www.linkedin.com/posts/bibesh-timalsina-a7a9482b9_machinelearning-healthcareai-medicalimaging-ugcPost-7446367081786429441-7i4O/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEx9-_4BQ4M633FOjbaeDu75W0pIsa5375U)
 
 ## 🔬 The SightX Story
 Diabetes is a global challenge, and Diabetic Retinopathy remains a leading cause of preventable blindness. For many, the first symptom is permanent vision loss. **SightX was built with a personal mission:** to bridge the gap between advanced medical AI and the patients who need it most, honoring a family journey with diabetes.
