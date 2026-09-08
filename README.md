@@ -14,10 +14,14 @@ Please see through the links for more info and backstory on SightX.
 
 SightX is built as a highly-decoupled microservices stack, ensuring scalability and clinical reliability.
 
-![System Architecture](./Docs/SightX.png)
+[ Update ] I am shipping SightX to AWS, below are a few key decisions I am taking while doing so, stay tuned 🫡
+
+![System Architecture](./Docs/SightX_V2.png)
 
 **📖 [Read the Detailed System Design & Architecture Document ➔](./SYSTEM_DESIGN.md)**  
-*(Includes details on our RHEL institutional deployment model, security flow, and data lifecycles).*
+*(Includes details about (old)RHEL institutional deployment model, security flow, and data lifecycles).*
+
+*This documentation is old and will be updated once i have successfully shipped it to AWS, stay tuned*
 
 | Component | Responsibility | Tech Stack | Documentation |
 | :--- | :--- | :--- | :--- |
