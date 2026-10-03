@@ -24,3 +24,10 @@ inference-engine/data/
 
 # Migration Files
 AWS_Migration_Plan.md
+CLAUDE.md
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
