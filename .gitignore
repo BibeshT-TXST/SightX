@@ -21,3 +21,6 @@ __pycache__/
 
 # Custom Exclusions
 inference-engine/data/
+
+# Migration Files
+AWS_Migration_Plan.md
