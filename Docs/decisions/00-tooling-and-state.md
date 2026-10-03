@@ -11,7 +11,9 @@ Terraform state needs a durable, private, lockable home and a bucket that holds 
 - A bootstrap config with local state → a versioned, encrypted, private S3 bucket with prevent_destroy 
 - The main stack uses the S3 backend with use_lockfile
 - Region us-east-2 
-- A sightx-admin IAM user for the CLI
+- A sightx-bibeshT IAM user for the CLI
+- us-east-2 offers on-demand Bedrock text models (38 listed as of 2026-10-03)
+- model chosen in later steps
 
 ## What could change in the future:
 - If we are working with a team we would need to move to IAM Identity Center with short-lived credentials instead of an access key
