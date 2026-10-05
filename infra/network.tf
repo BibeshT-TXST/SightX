@@ -44,3 +44,49 @@ resource "aws_subnet" "private_b" {
 
     tags = { Name = "sightx-private-b" }
 }
+
+# ---------------------------------
+# Internet gatway and route tables
+# ---------------------------------
+
+resource "aws_internet_gateway" "main" {
+    vpc_id = aws_vpc.main.id
+
+    tags = { Name = "sightx-igw"}
+}
+
+resource "aws_route_table" "public" {
+    vpc_id = aws_vpc.main.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.main.id 
+    }
+
+    tags = { Name = "sightx-public-rt" }
+}
+
+resource "aws_route_table_association" "public_a" {
+  subnet_id      = aws_subnet.public_a.id
+  route_table_id = aws_route_table.public.id
+}
+
+# AWS creates a "main" route table with every VPC. Adopting it as the private
+# table keeps the VPC at two route tables, and any subnet left unassociated
+# falls back to this one, which has no internet route. No route blocks: only
+# the implicit local route (10.0.0.0/16) remains.
+resource "aws_default_route_table" "private" {
+  default_route_table_id = aws_vpc.main.default_route_table_id
+
+  tags = { Name = "sightx-private-rt" }
+}
+
+resource "aws_route_table_association" "private_a" {
+  subnet_id      = aws_subnet.private_a.id
+  route_table_id = aws_default_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_b" {
+  subnet_id      = aws_subnet.private_b.id
+  route_table_id = aws_default_route_table.private.id
+}
