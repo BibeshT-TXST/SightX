@@ -90,3 +90,19 @@ resource "aws_route_table_association" "private_b" {
   subnet_id      = aws_subnet.private_b.id
   route_table_id = aws_default_route_table.private.id
 }
+
+# ----------------------------------------------------------------
+# S3 gateway endpoint: private path to S3 from both route tables
+# ----------------------------------------------------------------
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.main.id
+  service_name      = "com.amazonaws.us-east-2.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids = [
+    aws_route_table.public.id,
+    aws_default_route_table.private.id,
+  ]
+
+  tags = { Name = "sightx-s3-endpoint" }
+}
