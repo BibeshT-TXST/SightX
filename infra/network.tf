@@ -106,3 +106,86 @@ resource "aws_vpc_endpoint" "s3" {
 
   tags = { Name = "sightx-s3-endpoint" }
 }
+
+# ------------------
+# Security groups
+# ------------------
+
+# Strip every rule from the VPC's default security group so nothing can use it 
+resource "aws_default_security_group" "default" {
+    vpc_id = aws_vpc.main.id
+
+    tags = { Name = "sightx-default-unused" }
+}
+
+resource "aws_security_group" "lambda" {
+    name            = "sightx-lambda"
+    description     = "VPC Lambdas: no inbound, all outbound"
+    vpc_id          = aws_vpc.main.id
+
+    tags = { Name = "sightx-lambda" }
+}
+
+resource "aws_security_group" "worker" {
+    name            = "sightx-worker"
+    description     = "EC2 inference worker: no inbound, all outbound"
+    vpc_id          = aws_vpc.main.id
+
+    tags = { Name = "sightx-worker" }
+}
+
+resource "aws_security_group" "rds" {
+  name        = "sightx-rds"
+  description = "RDS: Postgres from Lambda and worker only"
+  vpc_id      = aws_vpc.main.id
+
+  tags = { Name = "sightx-rds" }
+}
+
+resource "aws_security_group" "endpoints" {
+  name        = "sightx-endpoints"
+  description = "Interface endpoints: HTTPS from Lambda only"
+  vpc_id      = aws_vpc.main.id
+
+  tags = { Name = "sightx-endpoints" }
+}
+
+# Outbound: Lambda and worker may reach anything
+# RDS and endpoints get no outbound rules; security groups
+# are stateful, so replies to allowed inbound traffic still go out.
+resource "aws_vpc_security_group_egress_rule" "lambda_all" {
+  security_group_id = aws_security_group.lambda.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1" # all protocols and ports
+}
+
+resource "aws_vpc_security_group_egress_rule" "worker_all" {
+  security_group_id = aws_security_group.worker.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
+
+# Inbound: referenced by security group ID, never by IP range.
+resource "aws_vpc_security_group_ingress_rule" "rds_from_lambda" {
+  security_group_id            = aws_security_group.rds.id
+  referenced_security_group_id = aws_security_group.lambda.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+}
+
+resource "aws_vpc_security_group_ingress_rule" "rds_from_worker" {
+  security_group_id            = aws_security_group.rds.id
+  referenced_security_group_id = aws_security_group.worker.id
+  ip_protocol                  = "tcp"
+  from_port                    = 5432
+  to_port                      = 5432
+}
+
+resource "aws_vpc_security_group_ingress_rule" "endpoints_from_lambda" {
+  security_group_id            = aws_security_group.endpoints.id
+  referenced_security_group_id = aws_security_group.lambda.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+}
