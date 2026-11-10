@@ -29,3 +29,23 @@ variable "dev_origins" {
   type        = list(string)
   default     = ["http://localhost:5173"]
 }
+
+# ── API abuse limits (the trial has no sign-in, so these are the guard) ──────
+
+variable "api_rate_limit" {
+  description = "Steady-state requests per second the HTTP API accepts across all callers; extra requests get 429."
+  type        = number
+  default     = 10
+}
+
+variable "api_burst_limit" {
+  description = "Requests the HTTP API accepts in a short burst above the rate limit."
+  type        = number
+  default     = 20
+}
+
+variable "api_reserved_concurrency" {
+  description = "Concurrent API Lambda executions, which also caps Postgres connections (one per instance). -1 leaves it unreserved: new accounts often have a 10-execution account limit, and reserving any of it then fails. Set e.g. 5 once Service Quotas shows 1000."
+  type        = number
+  default     = -1
+}

@@ -24,3 +24,8 @@ output "scans_bucket" {
   description = "Bucket receiving browser uploads (SCANS_BUCKET)"
   value       = aws_s3_bucket.scans.bucket
 }
+
+output "api_url" {
+  description = "HTTP API base URL for the frontend build (VITE_API_URL)"
+  value       = trimsuffix(aws_apigatewayv2_stage.default.invoke_url, "/")
+}
