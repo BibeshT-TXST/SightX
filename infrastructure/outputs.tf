@@ -9,3 +9,13 @@ output "db_master_secret_arn" {
   description = "Secrets Manager secret holding the master password (migrations only)"
   value       = aws_db_instance.main.master_user_secret[0].secret_arn
 }
+
+output "inference_queue_url" {
+  description = "SQS queue the worker polls (INFERENCE_QUEUE_URL)"
+  value       = aws_sqs_queue.inference.url
+}
+
+output "inference_dlq_url" {
+  description = "Dead-letter queue for scans that failed every attempt"
+  value       = aws_sqs_queue.inference_dlq.url
+}
