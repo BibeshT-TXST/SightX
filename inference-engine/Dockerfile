@@ -12,9 +12,10 @@ ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir torch torchvision \
     --index-url https://download.pytorch.org/whl/cpu
 
-# The remaining runtime dependencies; torch/torchvision are already satisfied
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# The remaining runtime and worker dependencies; torch/torchvision are
+# already satisfied
+COPY requirements.txt requirements-worker.txt ./
+RUN pip install --no-cache-dir -r requirements-worker.txt
 
 # ── Source Orchestration ──
 COPY . .
@@ -22,5 +23,6 @@ COPY . .
 # Exposure: FastAPI standard interface
 EXPOSE 8000
 
-# Entrypoint: Launch high-performance Uvicorn worker
+# Default: the FastAPI server. The EC2 worker runs the same image with
+# `python worker.py` as the command.
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,10 @@
+# ── SightX Inference Worker: Dependencies ──
+# ─────────────────────────────────────────────
+# For worker.py on the EC2 worker: the runtime set plus AWS and Postgres
+# clients. The Docker image installs this file, so one image runs either
+# the FastAPI server (default CMD) or the worker (`python worker.py`).
+
+-r requirements.txt
+
+boto3             # SQS, S3 and RDS IAM auth tokens
+psycopg[binary]   # PostgreSQL client (psycopg 3)
