@@ -19,3 +19,8 @@ output "inference_dlq_url" {
   description = "Dead-letter queue for scans that failed every attempt"
   value       = aws_sqs_queue.inference_dlq.url
 }
+
+output "scans_bucket" {
+  description = "Bucket receiving browser uploads (SCANS_BUCKET)"
+  value       = aws_s3_bucket.scans.bucket
+}

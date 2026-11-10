@@ -17,3 +17,15 @@ variable "job_visibility_timeout_seconds" {
   type        = number
   default     = 300
 }
+
+variable "scan_retention_days" {
+  description = "Days an uploaded scan image is kept in S3. Job rows (results, decisions) stay in Postgres."
+  type        = number
+  default     = 7
+}
+
+variable "dev_origins" {
+  description = "Extra browser origins allowed to call the API and upload scans, e.g. the Vite dev server. The CloudFront domain is always allowed."
+  type        = list(string)
+  default     = ["http://localhost:5173"]
+}
