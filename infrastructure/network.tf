@@ -1,6 +1,9 @@
 # VPC and networking
-# One public subnet for the EC2 worker, two private subnets for RDS and 
-# the Lamndas, no NAT gatweay. Private subnets have no route to the internet
+# One public subnet for the EC2 worker, two private subnets for RDS and
+# the API Lambda, no NAT gateway. Private subnets have no route to the
+# internet, so nothing in them may need one: the API Lambda reaches only
+# RDS and signs S3 uploads locally; the worker (public subnet) makes every
+# other AWS call, including Bedrock.
 
 locals {
   # Two Availability Zones (AZs) because RDS subnet group must span
@@ -15,7 +18,7 @@ locals {
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true # the VPC's DNS resolver answers queries
-  enable_dns_hostnames = true # needed for private DNS on the Bedrock endpoint
+  enable_dns_hostnames = true # DNS names for instances and any future interface endpoint
 
   tags = { Name = "sightx-vpc" }
 }
@@ -142,17 +145,10 @@ resource "aws_security_group" "rds" {
   tags = { Name = "sightx-rds" }
 }
 
-resource "aws_security_group" "endpoints" {
-  name        = "sightx-endpoints"
-  description = "Interface endpoints: HTTPS from Lambda only"
-  vpc_id      = aws_vpc.main.id
-
-  tags = { Name = "sightx-endpoints" }
-}
-
-# Outbound: Lambda and worker may reach anything
-# RDS and endpoints get no outbound rules; security groups
-# are stateful, so replies to allowed inbound traffic still go out.
+# Outbound: Lambda and worker may reach anything (the Lambda's private
+# subnet still limits it to the VPC and the S3 gateway endpoint).
+# RDS gets no outbound rules; security groups are stateful, so replies
+# to allowed inbound traffic still go out.
 resource "aws_vpc_security_group_egress_rule" "lambda_all" {
   security_group_id = aws_security_group.lambda.id
   cidr_ipv4         = "0.0.0.0/0"
@@ -180,12 +176,4 @@ resource "aws_vpc_security_group_ingress_rule" "rds_from_worker" {
   ip_protocol                  = "tcp"
   from_port                    = 5432
   to_port                      = 5432
-}
-
-resource "aws_vpc_security_group_ingress_rule" "endpoints_from_lambda" {
-  security_group_id            = aws_security_group.endpoints.id
-  referenced_security_group_id = aws_security_group.lambda.id
-  ip_protocol                  = "tcp"
-  from_port                    = 443
-  to_port                      = 443
 }
