@@ -34,3 +34,18 @@ output "worker_asg_name" {
   description = "Auto Scaling group of the worker; find its instance ID here for SSM sessions"
   value       = aws_autoscaling_group.worker.name
 }
+
+output "frontend_url" {
+  description = "Public URL of the trial"
+  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
+
+output "frontend_bucket" {
+  description = "Bucket to sync frontend/dist into"
+  value       = aws_s3_bucket.frontend.bucket
+}
+
+output "frontend_distribution_id" {
+  description = "CloudFront distribution to invalidate after a deploy"
+  value       = aws_cloudfront_distribution.frontend.id
+}

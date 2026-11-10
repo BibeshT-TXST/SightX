@@ -10,8 +10,12 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  # Browser origins allowed to upload. Step 9 adds the CloudFront domain.
-  frontend_origins = var.dev_origins
+  # Browser origins allowed to upload scans and call the API: the
+  # CloudFront site (frontend.tf) plus any dev servers
+  frontend_origins = concat(
+    ["https://${aws_cloudfront_distribution.frontend.domain_name}"],
+    var.dev_origins,
+  )
 }
 
 resource "aws_s3_bucket" "scans" {
