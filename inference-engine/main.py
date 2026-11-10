@@ -1,94 +1,29 @@
 """
 SightX Inference Engine — FastAPI Server
 
-This module exposes a REST API for real-time Diabetic Retinopathy (DR) 
-grading using a trained ResNet-50 V2 model.
+This module exposes a REST API for real-time Diabetic Retinopathy (DR)
+grading. The model and grading logic live in predictor.py; this file only
+handles HTTP.
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
-import torch
-import io
-import os
-import time
-from PIL import Image
-from collections import Counter
 
 # Local project modules
-from model import DRClassifier
-from preprocessing import inference_transforms, tta_transforms
-from clinical_postprocessor import (
-    classify_clinical_tier,
-    aggregate_to_tiers,
-    risk_minimized_decision,
-    GRADE_TO_TIER,
-    TIER_LABELS,
-)
-import numpy as np
+from predictor import predict as predict_image, InvalidImageError
 
 
 # ── FastAPI Application Instance ─────────────────────────────────────────────
 app = FastAPI(title='SightX Inference Engine', version='1.0')
 
 
-# Selecting the best available hardware accelerator:
-#   • NVIDIA GPU    → 'cuda' (CUDA Toolkit)
-#   • Apple Silicon → 'mps'  (Metal Performance Shaders)
-#   • Otherwise     → 'cpu'  (Standard fallback)
-#
-# This ensures the 9GB container actually utilizes your hardware 
-# on Windows, Linux, or Mac without any code changes.
-if torch.cuda.is_available():
-    DEVICE = torch.device('cuda')
-elif torch.backends.mps.is_available():
-    DEVICE = torch.device('mps')
-else:
-    DEVICE = torch.device('cpu')
-
-# ── Model Initialization ──
-model = DRClassifier(num_classes=5)
-
-# Load weights and map to the designated accelerator (CUDA, MPS, or CPU)
-model.load_state_dict(torch.load('checkpoints/best_model.pt', map_location=DEVICE))
-
-# Evaluation mode: Disables dropout and stabilizes BatchNorm
-model.eval()
-model.to(DEVICE)
-
-
-# ── Test-Time Augmentation Settings ──
-# TTA_PASSES:     total passes per image (pass 0 is the deterministic anchor)
-# TTA_BATCH_SIZE: passes per forward pass; lower it if the host runs out of memory
-TTA_PASSES = int(os.getenv('TTA_PASSES', '108'))
-TTA_BATCH_SIZE = int(os.getenv('TTA_BATCH_SIZE', '8'))
-
-if TTA_PASSES < 1 or TTA_BATCH_SIZE < 1:
-    raise ValueError('TTA_PASSES and TTA_BATCH_SIZE must be at least 1')
-
-
-# ── Human-Readable Grade Labels ─────────────────────────────────────────────
-# Maps the model's integer output (argmax of logits) to clinically meaningful
-# descriptions following the International Clinical DR Severity Scale.
-#   Grade 0 — No DR:              no visible retinal abnormalities
-#   Grade 1 — Mild NPDR:          microaneurysms only
-#   Grade 2 — Moderate NPDR:      more than just microaneurysms
-#   Grade 3 — Severe NPDR:        extensive intraretinal abnormalities
-#   Grade 4 — Proliferative DR:   neovascularization or vitreous hemorrhage
-GRADE_LABELS = {
-    0: 'Grade 0: No DR',
-    1: 'Grade 1: Mild',
-    2: 'Grade 2: Moderate',
-    3: 'Grade 3: Severe',
-    4: 'Grade 4: Proliferative DR',
-}
-
-
 # ── Prediction Endpoint ─────────────────────────────────────────────────────
 @app.post('/predict')
 async def predict(file: UploadFile = File(...)):
     """
-    Receive a retinal fundus image and return the predicted DR grade with
-    a confidence score.
+    Receive a retinal fundus image and return the predicted clinical tier,
+    averaged probabilities and ensemble grade.
 
     **Request**
     - Method : POST
@@ -98,14 +33,16 @@ async def predict(file: UploadFile = File(...)):
     **Response** (JSON)
     ```json
     {
-        "grade": "Grade 2: Moderate",
+        "tier": "Doctor Visit Required",
         "confidence": 0.87,
-        "inference_time_ms": 142.5
+        "raw_model_grade_label": "Grade 2: Moderate",
+        "inference_time_ms": 4210.5
     }
     ```
+    (abridged; see predictor.predict for every field)
 
     **Errors**
-    - 400 : Unsupported file type (only JPEG/PNG accepted)
+    - 400 : Unsupported file type (only JPEG/PNG accepted) or unreadable image
     - 500 : Internal processing error
     """
 
@@ -116,85 +53,13 @@ async def predict(file: UploadFile = File(...)):
     if file.content_type not in ['image/jpeg', 'image/png']:
         raise HTTPException(400, 'Only JPEG/PNG images are accepted')
 
-    # Record the start time so we can report inference latency.
-    start_time = time.time()
-
-    # ── 2. Load image from the upload stream ─────────────────────────────
-    # `file.read()` pulls the raw bytes from the multipart upload.
-    # We wrap them in a BytesIO buffer so PIL can open them without
-    # touching the filesystem (faster, no temp-file cleanup needed).
+    # ── 2. Read the upload and grade it ──────────────────────────────────
+    # Inference is CPU-bound, so it runs in a worker thread to keep the
+    # event loop free for other requests.
     contents = await file.read()
-    image = Image.open(io.BytesIO(contents)).convert('RGB')
+    try:
+        result = await run_in_threadpool(predict_image, contents)
+    except InvalidImageError:
+        raise HTTPException(400, 'Uploaded file is not a readable image')
 
-    # ── 3. Base Image Loaded ─────────────────────────────────────────────
-    # Transforms are applied per pass below for Test-Time Augmentation.
-
-    # ── 4. Test-Time Augmentation (TTA) Ensemble ──
-    # Passes run TTA_BATCH_SIZE at a time: one forward pass over a batch is
-    # much cheaper than the same number of single-image passes.
-    all_raw_grades, all_confidences, all_grade_probs = [], [], []
-
-    with torch.no_grad():
-        for batch_start in range(0, TTA_PASSES, TTA_BATCH_SIZE):
-            batch_end = min(batch_start + TTA_BATCH_SIZE, TTA_PASSES)
-
-            # Pass 0: anchor (deterministic); later passes: TTA (stochastic)
-            batch = torch.stack([
-                inference_transforms(image) if i == 0 else tta_transforms(image)
-                for i in range(batch_start, batch_end)
-            ]).to(DEVICE)
-
-            batch_logits = model(batch).cpu().numpy()
-
-            for logits in batch_logits:
-                result = classify_clinical_tier(logits, prior_mode='clinical')
-                all_raw_grades.append(result['raw_grade'])
-                all_confidences.append(result['confidence'])
-                all_grade_probs.append(result['grade_probs'])
-
-    # ── 5. Calculate Ensembled Metrics ───────────────────────────────────
-    # Total wall-clock time for the whole request (the UI shows it as
-    # "Inference Time"), not the average of a single pass.
-    total_inference_time_ms = (time.time() - start_time) * 1000
-    mode_raw_grade = Counter(all_raw_grades).most_common(1)[0][0]
-    avg_confidence = sum(all_confidences) / len(all_confidences)
-
-    # Average the probabilities over every pass. Previously these came from
-    # the last pass only, a single random augmentation, so they could
-    # disagree with the ensemble tier reported alongside them.
-    mean_grade_probs = np.mean(all_grade_probs, axis=0)
-    mean_tier_probs = aggregate_to_tiers(mean_grade_probs)
-    _, mean_expected_costs = risk_minimized_decision(mean_tier_probs)
-
-    # Map the ensemble mode_raw_grade directly to the semantic clinical tier
-    ensemble_tier_id = GRADE_TO_TIER[mode_raw_grade]
-    ensemble_tier_info = TIER_LABELS[ensemble_tier_id]
-
-    # ── 6. Build and return the JSON response ────────────────────────────
-    return JSONResponse({
-        # Clinical tier decisions (directly mapping the mode grade)
-        'tier': ensemble_tier_info['name'],
-        'tier_emoji': ensemble_tier_info['emoji'],
-        'action': ensemble_tier_info['action'],
-        'confidence': avg_confidence,
-        
-        # Detailed probability breakdown
-        'tier_probabilities': {
-            'no_disease': round(float(mean_tier_probs[0]), 4),
-            'recommended': round(float(mean_tier_probs[1]), 4),
-            'required': round(float(mean_tier_probs[2]), 4),
-        },
-        'expected_costs': {
-            'no_disease': round(float(mean_expected_costs[0]), 2),
-            'recommended': round(float(mean_expected_costs[1]), 2),
-            'required': round(float(mean_expected_costs[2]), 2),
-        },
-        'grade_probabilities': {
-            f'grade_{i}': round(float(p), 4) for i, p in enumerate(mean_grade_probs)
-        },
-
-        # Monte-carlo ensemble metrics
-        'raw_model_grade': mode_raw_grade,
-        'raw_model_grade_label': GRADE_LABELS[mode_raw_grade],
-        'inference_time_ms': round(total_inference_time_ms, 2)
-    })
+    return JSONResponse(result)
