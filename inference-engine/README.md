@@ -36,6 +36,7 @@ The SightX Inference Engine is a clinical diagnostic service. It uses a custom R
    pip install -r requirements.txt
    uvicorn main:app --reload
    ```
+   For training or evaluation scripts (`train.py`, `evaluate.py`, etc.), install `requirements-train.txt` instead; it includes the runtime set.
 
 2. **Docker Deployment**:
    ```bash

@@ -1,0 +1,11 @@
+# ── SightX Inference Engine: Training & Evaluation Dependencies ──
+# ─────────────────────────────────────────────
+# For train.py, evaluate.py, calibrate_temperature.py,
+# test_postprocessor.py and preprocess_retinal.py.
+# Not installed in the inference image.
+
+-r requirements.txt
+
+pandas
+scikit-learn
+opencv-python-headless # preprocess_retinal.py

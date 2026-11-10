@@ -5,13 +5,14 @@ FROM python:3.10-slim-bookworm
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 
-# Install system utilities required for high-performance image processing
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
 # ── Dependency Installation ──
+# CPU-only torch/torchvision first: the default PyPI wheels bundle CUDA
+# libraries (several GB) that a CPU host never uses. The CPU index has
+# both x86_64 and arm64 (Graviton) builds.
+RUN pip install --no-cache-dir torch torchvision \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# The remaining runtime dependencies; torch/torchvision are already satisfied
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
