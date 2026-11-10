@@ -1,5 +1,4 @@
 import { Box, Typography, Button } from '@mui/material';
-import VerifiedIcon from '@mui/icons-material/Verified';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -10,8 +9,17 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { listJobs } from '../lib/api';
+import { getSessionId, resetSession } from '../lib/session';
+
+/* ── Job status shown where a diagnosis is not available yet ── */
+const STATUS_LABELS = {
+  queued: 'Queued',
+  processing: 'Processing',
+  graded: 'Awaiting decision',
+  suggested: 'Awaiting decision',
+  failed: 'Failed',
+};
 
 /* ── Severity Helpers ── */
 const getSeverity = (diagnosis) => {
@@ -37,38 +45,46 @@ const formatDate = (dateString) => {
 };
 
 /**
- * AccountsPage displays the practitioner profile, diagnostic statistics,
- * and a comprehensive scan history log.
+ * AccountsPage displays the trial session, diagnostic statistics,
+ * and the session's scan history.
  */
 export default function AccountsPage() {
-  const { session, profile } = useAuth();
+  const [sessionId, setSessionId] = useState(getSessionId);
   const [scans, setScans] = useState([]);
+  const [loadError, setLoadError] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 4;
 
+  // Reload whenever the session changes (including "Start new session")
   useEffect(() => {
-    async function fetchScans() {
-      if (!session) return;
-      const { data, error } = await supabase
-        .from('patient_scans')
-        .select('*')
-        .eq('practitioner_id', session.user.id)
-        .order('created_at', { ascending: false });
+    let cancelled = false;
+    listJobs()
+      .then((jobs) => {
+        if (!cancelled) {
+          setScans(jobs);
+          setLoadError('');
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setLoadError(error.message);
+      });
+    return () => { cancelled = true; };
+  }, [sessionId]);
 
-      if (!error && data) {
-        setScans(data);
-      } else {
-        console.error('Error fetching scans:', error);
-      }
-    }
-    fetchScans();
-  }, [session]);
+  const handleNewSession = () => {
+    resetSession();
+    setScans([]);
+    setCurrentPage(1);
+    setSessionId(getSessionId());
+  };
 
   /* ── Computed Stats ── */
-  const overrideCount = scans.filter((s) => s.ai_diagnosis !== s.final_diagnosis).length;
-  const overrideRate = scans.length > 0 ? ((overrideCount / scans.length) * 100).toFixed(1) : '0.0';
+  // Only scans with a recorded decision can be compared with the AI
+  const decidedScans = scans.filter((s) => s.final_diagnosis);
+  const overrideCount = decidedScans.filter((s) => s.ai_diagnosis !== s.final_diagnosis).length;
+  const overrideRate = decidedScans.length > 0 ? ((overrideCount / decidedScans.length) * 100).toFixed(1) : '0.0';
   const urgentCount = scans.filter((s) => s.final_diagnosis?.includes('Mandatory')).length;
 
   /* ── Filtered Scans ── */
@@ -103,7 +119,7 @@ export default function AccountsPage() {
               lineHeight: 1.1,
             }}
           >
-            Practitioner Account
+            Trial Account
           </Typography>
           <Typography
             sx={{
@@ -114,8 +130,13 @@ export default function AccountsPage() {
               mt: 1,
             }}
           >
-            Profile overview, diagnostic statistics, and scan session history.
+            Diagnostic statistics and scan history for this browser&apos;s trial session.
           </Typography>
+          {loadError && (
+            <Typography sx={{ color: '#dc2626', fontSize: '0.875rem', mt: 2 }}>
+              Could not load scan history: {loadError}
+            </Typography>
+          )}
         </Box>
 
         {/* ── Profile + Stats Grid ── */}
@@ -167,17 +188,16 @@ export default function AccountsPage() {
                     letterSpacing: '0.1em',
                   }}
                 >
-                  Practitioner Profile
+                  Trial Session
                 </Typography>
               </Box>
 
-              {/* Name + Role */}
+              {/* Name + Mode */}
               <Box sx={{ textAlign: 'center', mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                   <Typography sx={{ fontSize: '1.375rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#171c22' }}>
-                    {profile ? `${profile.first_name} ${profile.last_name}` : '—'}
+                    Guest Clinician
                   </Typography>
-                  <VerifiedIcon sx={{ fontSize: 18, color: '#0057c0' }} />
                 </Box>
                 <Box
                   sx={{
@@ -196,21 +216,21 @@ export default function AccountsPage() {
                     letterSpacing: '0.1em',
                   }}
                 >
-                  {profile ? profile.role : '—'}
+                  Trial mode
                 </Box>
               </Box>
 
               {/* Info rows */}
               {[
                 {
-                  label: 'Last Session',
+                  label: 'Last Scan',
                   value: scans.length > 0
                     ? `${formatDate(scans[0].created_at).date} • ${formatDate(scans[0].created_at).time}`
-                    : 'No sessions',
+                    : 'No scans yet',
                   accent: '#0057c0',
                 },
-                { label: 'Clinical Unit', value: profile ? profile.clinical_unit : '—', accent: '#7c3aed' },
-                { label: 'Practitioner ID', value: profile ? profile.practitioner_id : '—', accent: '#00685f', mono: true },
+                { label: 'Visible To', value: 'This browser only', accent: '#7c3aed' },
+                { label: 'Session ID', value: sessionId.slice(0, 8), accent: '#00685f', mono: true },
               ].map((item, i) => (
                 <Box
                   key={item.label}
@@ -237,6 +257,25 @@ export default function AccountsPage() {
                   </Typography>
                 </Box>
               ))}
+
+              {/* Start over with an empty history */}
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={handleNewSession}
+                sx={{
+                  mt: 2.5,
+                  borderRadius: '0.625rem',
+                  fontWeight: 700,
+                  fontSize: '0.8125rem',
+                  textTransform: 'none',
+                  borderColor: '#e2e8f0',
+                  color: '#414755',
+                  '&:hover': { borderColor: '#0057c0', color: '#0057c0', bgcolor: 'rgba(0,87,192,0.04)' },
+                }}
+              >
+                Start New Session
+              </Button>
             </Box>
           </Box>
 
@@ -271,7 +310,7 @@ export default function AccountsPage() {
                   {scans.length}
                 </Typography>
                 <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', mt: 1 }}>
-                  Lifetime diagnostic sessions performed
+                  Scans uploaded in this trial session
                 </Typography>
               </Box>
               {/* Decorative */}
@@ -313,7 +352,7 @@ export default function AccountsPage() {
                     {overrideRate}%
                   </Typography>
                   <Typography sx={{ fontSize: '0.6875rem', color: '#64748b', mt: 1 }}>
-                    {overrideCount} of {scans.length} scans overridden
+                    {overrideCount} of {decidedScans.length} decided scans overridden
                   </Typography>
                 </Box>
               </Box>
@@ -393,7 +432,7 @@ export default function AccountsPage() {
                   Scan History
                 </Typography>
                 <Typography sx={{ fontSize: '0.6875rem', color: '#94a3b8', mt: 0.25 }}>
-                  {filteredScans.length} of {scans.length} sessions shown
+                  {filteredScans.length} of {scans.length} scans shown
                 </Typography>
               </Box>
             </Box>
@@ -574,7 +613,7 @@ export default function AccountsPage() {
                             }}
                           >
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: aiStyle.dot }} />
-                            {row.ai_diagnosis}
+                            {row.ai_diagnosis ?? STATUS_LABELS[row.status]}
                           </Box>
                         </Box>
 
@@ -596,7 +635,7 @@ export default function AccountsPage() {
                             }}
                           >
                             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: finalStyle.dot }} />
-                            {row.final_diagnosis}
+                            {row.final_diagnosis ?? STATUS_LABELS[row.status]}
                           </Box>
                         </Box>
                       </Box>
