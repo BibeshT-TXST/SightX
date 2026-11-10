@@ -10,34 +10,53 @@ Please see through the links for more info and backstory on SightX.
 ### Live Demonstration of SightX: [Click Here](https://www.linkedin.com/posts/bibesh-timalsina-a7a9482b9_machinelearning-healthcareai-medicalimaging-ugcPost-7446367081786429441-7i4O/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEx9-_4BQ4M633FOjbaeDu75W0pIsa5375U)
 ---
 
-## 🏗 System Architecture
+## ☁️ V2: SightX on AWS
 
-SightX is built as a highly-decoupled microservices stack, ensuring scalability and clinical reliability.
+V1 was about security: Supabase authentication, row-level security and institutional RHEL servers. **V2 is about cloud usability**: an open trial on AWS that anyone can try without signing in, built to stay up on its own and cost about $32 a month.
 
-[ Update ] I am shipping SightX to AWS, below are a few key decisions I am taking while doing so, stay tuned 🫡
+```mermaid
+flowchart LR
+    B[Browser] -->|HTTPS| CF[CloudFront + S3]
+    B -->|REST| API[HTTP API → Lambda]
+    API --> DB[(RDS Postgres)]
+    B -->|presigned upload| S3[(S3 scans)]
+    S3 -->|ObjectCreated| Q[SQS queue]
+    Q --> W[EC2 worker<br/>ResNet-50 TTA]
+    W --> DB
+    W -->|suggestion| BR[Bedrock Nova Micro]
+```
 
-![System Architecture](./Docs/SightX_V2.png)
+1. Enter made-up patient details and upload a fundus image. It goes straight from the browser to S3.
+2. S3 queues the scan; a self-healing EC2 worker grades it with the 108-pass TTA ensemble.
+3. Bedrock (Amazon Nova Micro) adds a short suggestion from the patient's earlier results, never their name or ID.
+4. You record the final diagnosis, once.
 
-**📖 [Read the Detailed System Design & Architecture Document ➔](./SYSTEM_DESIGN.md)**  
-*(Includes details about (old)RHEL institutional deployment model, security flow, and data lifecycles).*
-
-*This documentation is old and will be updated once i have successfully shipped it to AWS, stay tuned*
+**📖 [System Design & Architecture ➔](./SYSTEM_DESIGN.md)**: full diagrams, scan lifecycle, data model, trust model, failure handling and costs.
+**🧭 [Decision Records ➔](./Docs/decisions/)**: why each piece was chosen and what was rejected.
 
 | Component | Responsibility | Tech Stack | Documentation |
 | :--- | :--- | :--- | :--- |
-| **Frontend** | Clinical Interface & User Flow | React, MUI, Vite | [View README](./frontend/README.md) |
-| **Backend** | API Orchestration & Gateway | Node.js, Express, Multer | [View README](./backend/README.md) |
-| **Inference Engine** | ResNet AI & Clinical Post-processing | PyTorch, FastAPI, NumPy | [View README](./inference-engine/README.md) |
+| **Frontend** | Trial UI: upload, live status, decision, history | React, MUI, Vite | [View README](./frontend/README.md) |
+| **API** | Jobs, presigned uploads, decisions | Node.js 22 on Lambda, API Gateway | [View README](./api/README.md) |
+| **Inference Engine & Worker** | ResNet AI, clinical post-processing, Bedrock suggestion | PyTorch, SQS worker on EC2, FastAPI (local) | [View README](./inference-engine/README.md) |
+| **Database** | Patients and jobs, write-once decisions | PostgreSQL 16 on RDS | [View README](./db/README.md) |
+| **Infrastructure** | Every AWS resource, deploy runbook | Terraform | [View README](./infrastructure/README.md) |
 
 ---
 
 ## 🌟 Technical Highlights
 ### 1. Clinical-Grade AI Safety
-- **108-Iteration TTA Ensemble**: Robustness against camera artifacts using Test-Time Augmentation.
+- **108-Iteration TTA Ensemble**: Robustness against camera artifacts using Test-Time Augmentation, batched for CPU inference.
 - **Bayesian Prior Correction**: Adjusts for training-set bias (EyePACS) to reflect real-world clinical prevalence.
 - **Risk-Minimized Decisions**: Uses an asymmetric cost matrix to prioritize patient safety over raw accuracy.
 
-### 2. Clinical UI
+### 2. Cloud Reliability on a Student Budget
+- **Queue-based processing**: Scans wait safely in SQS; failed scans retry, then land in a dead-letter queue with an alarm.
+- **Self-healing worker**: An Auto Scaling group of one replaces a failed instance; systemd restarts a crashed process.
+- **No NAT gateway, no idle endpoints**: Private resources never need the internet, which keeps networking at $0.
+- **Least privilege throughout**: Separate IAM and database roles per service, IAM database auth, SSM instead of SSH.
+
+### 3. Clinical UI
 - **The "No-Line" Rule**: A design philosophy utilizing tonal layering and depth instead of harsh borders.
 - **Clinical Aesthetics**: Glassmorphism and high-performance animations tailored for medical environments.
 
@@ -45,52 +64,33 @@ SightX is built as a highly-decoupled microservices stack, ensuring scalability 
 
 ## 📋 Prerequisites
 
-Before launching the SightX stack, ensure you have the following installed:
-
-1. **Docker & Docker Compose**: (Required for Orchestration)
-   - [Install Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Compose).
-2. **Supabase Account**: (Required for Persistence)
-   - [Sign up for free](https://supabase.com/dashboard/sign-up).
-3. **Local Dev Tools** (Optional - only if running services individually):
-   - **Node.js 18+**: For Frontend and Backend.
-   - **Python 3.10+**: For the Inference Engine.
+| Tool | Version | For |
+| :--- | :--- | :--- |
+| **Node.js** | 22 | Frontend and API |
+| **Python** | 3.10+ | Inference engine and worker |
+| **Terraform** | 1.10+ | Deploying to AWS |
+| **AWS CLI v2** + Session Manager plugin | latest | Deploying and operating |
 
 ---
 
-## 🚀 Quick Start (Orchestration)
-The entire SightX stack is containerized for professional deployment.
+## 🚀 Quick Start
 
-1. **Environment Config**: Ensure your `.env` contains the required Supabase and AI engine tokens.
-2. **Launch Stack**:
-   ```bash
-   docker-compose up --build
-   ```
-3. **Internal Access**:
-   - Frontend: `http://localhost:80`
-   - Backend API: `http://localhost:5001`
-   - Inference Engine: `http://localhost:8000`
+### Run pieces locally
+```bash
+# API tests
+cd api && npm ci && npm test
 
-## 🔗 Supabase Persistence & Authentication
+# Inference engine: local FastAPI server for the model
+cd inference-engine && pip install -r requirements.txt && uvicorn main:app --reload
 
-SightX uses **Supabase** (Postgres + Auth + Row Level Security) to manage practitioner accounts, clinical roles, and diagnostic records.
+# Frontend against a deployed API
+cd frontend && npm ci
+echo "VITE_API_URL=https://<your-api-id>.execute-api.us-east-2.amazonaws.com" > .env.local
+npm run dev
+```
 
-The complete Supabase setup guide — including project creation, schema SQL, RLS policies, superuser bootstrapping, clinician registration, and troubleshooting — lives in the **Backend README**:
-
-### 📖 [**Full Supabase & Auth Setup Guide →**](./backend/README.md#-supabase-persistence--authentication-setup)
-
-**Quick overview of what's covered:**
-
-| Step | Description |
-| :--- | :--- |
-| **1–3** | Create Supabase project, grab API keys, configure `.env` |
-| **4** | Disable email confirmation for local dev |
-| **5–6** | Run schema SQL (tables, trigger) and RLS policies |
-| **7** | Create the first superuser via the Supabase dashboard |
-| **8** | Register clinicians through the app's admin panel |
-| **9** | Log in as a clinician and access the dashboard |
-
-> [!TIP]
-> If you're setting up SightX for the first time, start with the [Backend README](./backend/README.md) — it has the full step-by-step walkthrough.
+### Deploy to AWS
+Build the API package, `terraform apply`, run the migrations over SSM, and sync the frontend to S3. Every step, plus updates, logs, pausing and teardown, is in the **[Infrastructure README](./infrastructure/README.md)**.
 
 ---
 
@@ -103,13 +103,10 @@ SightX is optimized for high-resolution retinal imaging. To ensure diagnostic ac
 - **Standards**: Images should ideally be DICOM-compliant with unique patient identifiers at the point of capture.
 - **Environment**: Controlled lighting to minimize artifacts and lens flare.
 
-### 2. Governance & Data Sovereignty
-SightX is designed for institutional deployment and adheres to strict clinical governance:
-- **Environment**: Must operate exclusively within **Hospital/Clinical Environments** under direct supervision of medical authorities.
-- **User Roles**: Intended for use by **Verified Clinicians** and **Medical Residents**.
-- **Regulatory (HIPAA/GDPR)**: For real-world patient data, SightX requires a **Supabase B2B/Enterprise Plan**.
-    - **Isolated Infrastructure**: Each institution must host a separate, sovereign database instance.
-    - **Encryption**: Enterprise-grade encryption at rest and in transit is mandatory for HPI (Health Protected Information).
+### 2. The V2 Trial and Real Patient Data
+- **The V2 trial is open and has no sign-in.** Use **made-up patient details only**. Each browser gets its own anonymous session, which keeps visitors apart but is not authentication.
+- Uploaded images are deleted after 7 days.
+- **A clinical deployment** would need authentication and role-based access (as in V1), a worker in a private subnet, institutional review, and HIPAA/GDPR coverage including a Business Associate Agreement for every service that touches patient data (RDS, S3, Bedrock).
 
 ---
 
