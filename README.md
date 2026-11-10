@@ -3,16 +3,21 @@
 ## 🔬 The SightX Story
 Diabetes is a global challenge, and Diabetic Retinopathy remains a leading cause of preventable blindness. For many, the first symptom is permanent vision loss. **SightX was built with a personal mission:** to bridge the gap between advanced medical AI and the patients who need it most, honoring a family journey with diabetes.
 
-By combining a **ResNet-50 V2** backbone with Bayesian decision theory and a "No-Line" clinical UI, SightX provides a robust, safe, and beautiful screening experience. 
+By combining a **ResNet-50 V2** with Bayesian decision theory and a "No-Line" clinical UI, SightX provides a safe, and beautiful screening experience. 
 
 Please see through the links for more info and backstory on SightX.
 ### The Developmental Journey of SightX(Blog): [Click Here](https://darkmatterstech.blogspot.com/)
-### Live Demonstration of SightX: [Click Here](https://www.linkedin.com/posts/bibesh-timalsina-a7a9482b9_machinelearning-healthcareai-medicalimaging-ugcPost-7446367081786429441-7i4O/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEx9-_4BQ4M633FOjbaeDu75W0pIsa5375U)
+### Live Demonstration of SightX V2 : (building a cd pipeline :P stay tuned coming soon !!!)
+### Live Demonstration of SightX V1 (old): [Click Here](https://www.linkedin.com/posts/bibesh-timalsina-a7a9482b9_machinelearning-healthcareai-medicalimaging-ugcPost-7446367081786429441-7i4O/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEx9-_4BQ4M633FOjbaeDu75W0pIsa5375U) 
 ---
 
 ## ☁️ V2: SightX on AWS
 
-V1 was about security: Supabase authentication, row-level security and institutional RHEL servers. **V2 is about cloud usability**: an open trial on AWS that anyone can try without signing in, built to stay up on its own and cost about $32 a month.
+V1 was about security: Supabase authentication, row-level security and institutional RHEL servers. **V2 is about cloud usability**: an open trial on AWS that anyone can try without signing in. 
+
+## Important !
+
+#### Currently the infrastructure is built via terraform apply manually, the project will be started for testing, bug fixes and 3 days prior to interviews. Feel free to email me if you want to try out the product at a specific time :)
 
 ![SightX V2 architecture on AWS](./Docs/SightX_V2.png)
 
