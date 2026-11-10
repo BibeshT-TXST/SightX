@@ -2,13 +2,14 @@
 
 PostgreSQL schema for the AWS deployment (RDS). It replaces the Supabase `profiles` and `patient_scans` tables.
 
+V2 is an open trial with no sign-in. Each browser generates a random session ID, and every patient and job belongs to one session, so visitors never see each other's scans. Sessions separate data; they are not authentication, so the trial must only be used with made-up patient details.
+
 | Table | Holds |
 | --- | --- |
-| `users` | One row per clinician, keyed by their Cognito user ID |
-| `patients` | One row per patient (`mrn` is the hospital patient ID) |
-| `jobs` | One row per scan: image key, status, AI result, Bedrock suggestion, final decision |
+| `patients` | One row per patient per session (`mrn` is the form's Patient ID, unique within a session) |
+| `jobs` | One row per scan: session, image key, status, AI result, Bedrock suggestion, final decision |
 
-A job moves `queued → processing → graded → suggested`, or to `failed`. The clinician's `final_diagnosis` can be written once and never changed; a trigger enforces this even for the database owner.
+A job moves `queued → processing → graded → suggested`, or to `failed`. The `final_diagnosis` can be written once and never changed; a trigger enforces this even for the database owner.
 
 ## Migrations
 
@@ -26,7 +27,7 @@ Never edit a migration that has already run against RDS. Add a new numbered file
 
 `002_app_roles.sql` creates two login roles with no password:
 
-- `sightx_api` (API Lambda): inserts users, patients and jobs; can update only `final_diagnosis` and `decided_at`.
+- `sightx_api` (API Lambda): inserts patients and jobs; can update only `final_diagnosis` and `decided_at`.
 - `sightx_worker` (inference worker): reads jobs and patients; can update only status, result and suggestion columns.
 
 On RDS both are granted `rds_iam` and log in with IAM auth tokens, so no database password is stored anywhere. Locally, connect as your own Postgres user.

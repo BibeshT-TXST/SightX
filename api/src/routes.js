@@ -2,15 +2,16 @@
  * SightX API routes.
  *
  * Each route takes (req, deps):
- *   req.claims  verified Cognito ID token claims (API Gateway checked the JWT)
- *   req.body    parsed JSON body, or {}
- *   req.params  path parameters
- *   deps.db     anything with query(sql, params) -> { rows }
+ *   req.sessionId  the caller's trial session ID (validated UUID)
+ *   req.body       parsed JSON body, or {}
+ *   req.params     path parameters
+ *   deps.db        anything with query(sql, params) -> { rows }
  *   deps.presignUpload(key, contentType) -> { url, fields }
  * and returns { status, body }. Throwing HttpError sends that status.
  *
- * A clinician only ever sees and decides on their own jobs: every query is
- * scoped to the caller's Cognito user ID (sub), never to an ID in the body.
+ * V2 is an open trial with no sign-in. Every query is scoped to the caller's
+ * session, so visitors never see or decide on each other's scans. A session
+ * separates data; it is not authentication.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -28,9 +29,8 @@ export const DIAGNOSES = [
   'Doctor Visit Mandatory',
 ];
 
-const ROLES = ['superuser', 'clinician', 'resident', 'fellow', 'attending'];
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IMAGE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png' };
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const JOB_LIST_LIMIT = 200;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,57 +52,7 @@ function requireJobId(params) {
   return id;
 }
 
-/**
- * Return the caller's users row, creating it from the token on first use.
- * Profile fields come from Cognito attributes that only an admin can set.
- */
-async function ensureUser(db, claims) {
-  const found = await db.query('SELECT * FROM users WHERE id = $1', [claims.sub]);
-  if (found.rows.length) return found.rows[0];
-
-  const role = ROLES.includes(claims['custom:role']) ? claims['custom:role'] : 'clinician';
-  await db.query(
-    `INSERT INTO users (id, email, first_name, last_name, practitioner_id, role, clinical_unit)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT DO NOTHING`,
-    [
-      claims.sub,
-      claims.email,
-      claims.given_name ?? '',
-      claims.family_name ?? '',
-      claims['custom:practitioner_id'] || null,
-      role,
-      claims['custom:clinical_unit'] || null,
-    ],
-  );
-
-  const created = await db.query('SELECT * FROM users WHERE id = $1', [claims.sub]);
-  if (!created.rows.length) {
-    // ON CONFLICT hit another unique column, e.g. the email belongs to an
-    // older account that was deleted and recreated in Cognito
-    throw new HttpError(403, 'Account conflicts with an existing user; contact an administrator');
-  }
-  return created.rows[0];
-}
-
 // ── Routes ───────────────────────────────────────────────────────────────────
-
-/** GET /me — the caller's profile. */
-export async function getMe(req, { db }) {
-  const user = await ensureUser(db, req.claims);
-  return {
-    status: 200,
-    body: {
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      practitioner_id: user.practitioner_id,
-      role: user.role,
-      clinical_unit: user.clinical_unit,
-    },
-  };
-}
 
 /**
  * POST /scans — start a scan.
@@ -117,37 +67,39 @@ export async function createScan(req, { db, presignUpload }) {
   const extension = IMAGE_TYPES[req.body.contentType];
   if (!extension) throw new HttpError(400, 'contentType must be image/jpeg or image/png');
 
-  const user = await ensureUser(db, req.claims);
-
-  // An existing MRN keeps its stored name; the MRN identifies the patient
+  // Within a session, an existing Patient ID keeps its stored name
   await db.query(
-    'INSERT INTO patients (mrn, full_name) VALUES ($1, $2) ON CONFLICT (mrn) DO NOTHING',
-    [patientMrn, patientName],
+    `INSERT INTO patients (session_id, mrn, full_name) VALUES ($1, $2, $3)
+     ON CONFLICT (session_id, mrn) DO NOTHING`,
+    [req.sessionId, patientMrn, patientName],
   );
-  const patient = await db.query('SELECT id FROM patients WHERE mrn = $1', [patientMrn]);
+  const patient = await db.query(
+    'SELECT id FROM patients WHERE session_id = $1 AND mrn = $2',
+    [req.sessionId, patientMrn],
+  );
 
   const jobId = randomUUID();
   const imageKey = `scans/${jobId}.${extension}`;
   await db.query(
-    'INSERT INTO jobs (id, patient_id, practitioner_id, image_key) VALUES ($1, $2, $3, $4)',
-    [jobId, patient.rows[0].id, user.id, imageKey],
+    'INSERT INTO jobs (id, session_id, patient_id, image_key) VALUES ($1, $2, $3, $4)',
+    [jobId, req.sessionId, patient.rows[0].id, imageKey],
   );
 
   const upload = await presignUpload(imageKey, req.body.contentType);
   return { status: 201, body: { jobId, upload } };
 }
 
-/** GET /jobs — the caller's scans, newest first (Accounts page). */
+/** GET /jobs — the session's scans, newest first (history page). */
 export async function listJobs(req, { db }) {
   const { rows } = await db.query(
     `SELECT j.id, j.status, j.created_at, j.ai_diagnosis, j.final_diagnosis,
             p.full_name AS patient_name, p.mrn AS patient_mrn
        FROM jobs j
        JOIN patients p ON p.id = j.patient_id
-      WHERE j.practitioner_id = $1
+      WHERE j.session_id = $1
       ORDER BY j.created_at DESC
       LIMIT $2`,
-    [req.claims.sub, JOB_LIST_LIMIT],
+    [req.sessionId, JOB_LIST_LIMIT],
   );
   return { status: 200, body: { jobs: rows } };
 }
@@ -162,15 +114,15 @@ export async function getJob(req, { db }) {
             p.full_name AS patient_name, p.mrn AS patient_mrn
        FROM jobs j
        JOIN patients p ON p.id = j.patient_id
-      WHERE j.id = $1 AND j.practitioner_id = $2`,
-    [id, req.claims.sub],
+      WHERE j.id = $1 AND j.session_id = $2`,
+    [id, req.sessionId],
   );
   if (!rows.length) throw new HttpError(404, 'Job not found');
   return { status: 200, body: rows[0] };
 }
 
 /**
- * POST /jobs/{id}/decision — record the clinician's final diagnosis.
+ * POST /jobs/{id}/decision — record the final diagnosis.
  * Body: { finalDiagnosis }
  *
  * Write-once: the database trigger also rejects any later change.
@@ -185,18 +137,18 @@ export async function recordDecision(req, { db }) {
   const updated = await db.query(
     `UPDATE jobs
         SET final_diagnosis = $1, decided_at = now()
-      WHERE id = $2 AND practitioner_id = $3
+      WHERE id = $2 AND session_id = $3
         AND final_diagnosis IS NULL
         AND status IN ('graded', 'suggested')
       RETURNING id, final_diagnosis, decided_at`,
-    [finalDiagnosis, id, req.claims.sub],
+    [finalDiagnosis, id, req.sessionId],
   );
   if (updated.rows.length) return { status: 200, body: updated.rows[0] };
 
   // Nothing updated: work out why
   const { rows } = await db.query(
-    'SELECT status, final_diagnosis FROM jobs WHERE id = $1 AND practitioner_id = $2',
-    [id, req.claims.sub],
+    'SELECT status, final_diagnosis FROM jobs WHERE id = $1 AND session_id = $2',
+    [id, req.sessionId],
   );
   if (!rows.length) throw new HttpError(404, 'Job not found');
   if (rows[0].final_diagnosis) throw new HttpError(409, 'A final diagnosis is already recorded');
@@ -205,7 +157,6 @@ export async function recordDecision(req, { db }) {
 
 // Keys match API Gateway HTTP API route keys
 export const routes = {
-  'GET /me': getMe,
   'POST /scans': createScan,
   'GET /jobs': listJobs,
   'GET /jobs/{id}': getJob,

@@ -1,36 +1,31 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- SightX schema v1: users, patients, jobs
+-- SightX schema v1: patients, jobs
 --
--- Replaces the Supabase `profiles` and `patient_scans` tables.
---   users     one row per clinician, keyed by their Cognito user ID (sub)
---   patients  one row per patient, so a new scan can see the patient's history
+-- Replaces the Supabase `patient_scans` table. V2 is an open trial with no
+-- sign-in: each browser generates a random session ID, and every row
+-- belongs to one session. Sessions keep visitors' data apart; they are not
+-- authentication. Use made-up patient details only.
+--
+--   patients  one row per patient per session, so a new scan can see that
+--             patient's history
 --   jobs      one row per scan: the uploaded image, the AI result, the Bedrock
---             suggestion and the clinician's final decision
+--             suggestion and the final decision
 -- Requires PostgreSQL 13+ (gen_random_uuid is built in).
 -- ─────────────────────────────────────────────────────────────────────────────
 
 BEGIN;
 
--- ── Users ────────────────────────────────────────────────────────────────────
--- Created on a clinician's first API call, from their Cognito token.
-CREATE TABLE users (
-    id               uuid        PRIMARY KEY,               -- Cognito `sub`
-    email            text        NOT NULL UNIQUE,
-    first_name       text        NOT NULL,
-    last_name        text        NOT NULL,
-    practitioner_id  text        UNIQUE,                    -- hospital staff ID
-    role             text        NOT NULL DEFAULT 'clinician'
-                     CHECK (role IN ('superuser', 'clinician', 'resident', 'fellow', 'attending')),
-    clinical_unit    text,
-    created_at       timestamptz NOT NULL DEFAULT now()
-);
-
 -- ── Patients ("Data table" in the architecture diagram) ─────────────────────
 CREATE TABLE patients (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    mrn         text        NOT NULL UNIQUE,  -- hospital patient ID (the scan form's "Patient ID")
+    session_id  uuid        NOT NULL,         -- trial session that created it
+    mrn         text        NOT NULL,         -- the scan form's "Patient ID"
     full_name   text        NOT NULL,
-    created_at  timestamptz NOT NULL DEFAULT now()
+    created_at  timestamptz NOT NULL DEFAULT now(),
+
+    -- The same Patient ID in two sessions is two different patients, so
+    -- one visitor's history never reaches another visitor's suggestion
+    CONSTRAINT patients_session_mrn_key UNIQUE (session_id, mrn)
 );
 
 -- ── Jobs ─────────────────────────────────────────────────────────────────────
@@ -40,8 +35,8 @@ CREATE TYPE job_status AS ENUM ('queued', 'processing', 'graded', 'suggested', '
 
 CREATE TABLE jobs (
     id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id       uuid        NOT NULL,          -- trial session that created it
     patient_id       uuid        NOT NULL REFERENCES patients (id),
-    practitioner_id  uuid        NOT NULL REFERENCES users (id),
     image_key        text        NOT NULL UNIQUE,   -- S3 object key of the uploaded scan
 
     -- Processing state, written by the worker
@@ -59,7 +54,7 @@ CREATE TABLE jobs (
     suggestion_model text,
     suggested_at     timestamptz,
 
-    -- Clinician decision: the only write a clinician makes, and only once
+    -- Final decision: the only write a user makes, and only once
     final_diagnosis  text,
     decided_at       timestamptz,
 
@@ -73,10 +68,10 @@ CREATE TABLE jobs (
     )
 );
 
--- Accounts page: a clinician's scans, newest first
-CREATE INDEX jobs_practitioner_created_idx ON jobs (practitioner_id, created_at DESC);
+-- History page: a session's scans, newest first
+CREATE INDEX jobs_session_created_idx ON jobs (session_id, created_at DESC);
 -- Bedrock suggestion: a patient's earlier scans, newest first
-CREATE INDEX jobs_patient_created_idx      ON jobs (patient_id, created_at DESC);
+CREATE INDEX jobs_patient_created_idx ON jobs (patient_id, created_at DESC);
 
 -- ── Triggers ─────────────────────────────────────────────────────────────────
 

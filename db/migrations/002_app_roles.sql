@@ -1,8 +1,8 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SightX schema v2: least-privilege database roles
 --
---   sightx_api     the API Lambda: creates users, patients and jobs, reads
---                  them back, and records the clinician's decision
+--   sightx_api     the API Lambda: creates patients and jobs, reads them
+--                  back, and records the final decision
 --   sightx_worker  the inference worker: claims jobs and writes AI results
 --                  and Bedrock suggestions; reads patient history
 --
@@ -35,7 +35,6 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO sightx_api, sightx_worker;
 
 -- ── API ──────────────────────────────────────────────────────────────────────
-GRANT SELECT, INSERT ON users    TO sightx_api;
 GRANT SELECT, INSERT ON patients TO sightx_api;
 GRANT SELECT, INSERT ON jobs     TO sightx_api;
 GRANT UPDATE (final_diagnosis, decided_at) ON jobs TO sightx_api;

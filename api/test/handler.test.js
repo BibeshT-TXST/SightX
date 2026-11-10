@@ -7,52 +7,43 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHandler } from '../src/handler.js';
 
-const ALICE = { sub: '11111111-1111-4111-8111-111111111111', email: 'alice@example.com', given_name: 'Alice', family_name: 'Ng', 'custom:role': 'attending' };
-const BOB = { sub: '22222222-2222-4222-8222-222222222222', email: 'bob@example.com', given_name: 'Bob', family_name: 'Lee' };
+const ALICE = '11111111-1111-4111-8111-111111111111';
+const BOB = '22222222-2222-4222-8222-222222222222';
 
 function fakeDb() {
-  const users = new Map();
-  const patients = new Map(); // mrn -> row
+  const patients = new Map(); // `${session}|${mrn}` -> row
   const jobs = new Map();
   const sql = (s) => s.replace(/\s+/g, ' ').trim();
 
   return {
-    users, patients, jobs,
+    patients, jobs,
     async query(text, params) {
       const q = sql(text);
-      if (q === 'SELECT * FROM users WHERE id = $1') {
-        return { rows: users.has(params[0]) ? [users.get(params[0])] : [] };
-      }
-      if (q.startsWith('INSERT INTO users')) {
-        const [id, email, first_name, last_name, practitioner_id, role, clinical_unit] = params;
-        if (![...users.values()].some((u) => u.email === email)) {
-          users.set(id, { id, email, first_name, last_name, practitioner_id, role, clinical_unit });
-        }
-        return { rows: [] };
-      }
       if (q.startsWith('INSERT INTO patients')) {
-        if (!patients.has(params[0])) patients.set(params[0], { id: `p-${params[0]}`, mrn: params[0], full_name: params[1] });
+        const [session, mrn, full_name] = params;
+        const key = `${session}|${mrn}`;
+        if (!patients.has(key)) patients.set(key, { id: `p-${patients.size + 1}`, session, mrn, full_name });
         return { rows: [] };
       }
-      if (q === 'SELECT id FROM patients WHERE mrn = $1') {
-        return { rows: [patients.get(params[0])] };
+      if (q === 'SELECT id FROM patients WHERE session_id = $1 AND mrn = $2') {
+        return { rows: [patients.get(`${params[0]}|${params[1]}`)] };
       }
       if (q.startsWith('INSERT INTO jobs')) {
-        const [id, patient_id, practitioner_id, image_key] = params;
-        jobs.set(id, { id, patient_id, practitioner_id, image_key, status: 'queued', final_diagnosis: null, created_at: new Date() });
+        const [id, session_id, patient_id, image_key] = params;
+        jobs.set(id, { id, session_id, patient_id, image_key, status: 'queued', final_diagnosis: null, created_at: new Date() });
         return { rows: [] };
       }
       if (q.startsWith('SELECT j.id, j.status, j.created_at')) {
-        return { rows: [...jobs.values()].filter((j) => j.practitioner_id === params[0]) };
+        return { rows: [...jobs.values()].filter((j) => j.session_id === params[0]) };
       }
       if (q.startsWith('SELECT j.id, j.status, j.error')) {
         const j = jobs.get(params[0]);
-        return { rows: j && j.practitioner_id === params[1] ? [j] : [] };
+        return { rows: j && j.session_id === params[1] ? [j] : [] };
       }
       if (q.startsWith('UPDATE jobs SET final_diagnosis')) {
-        const [diagnosis, id, sub] = params;
+        const [diagnosis, id, session] = params;
         const j = jobs.get(id);
-        if (j && j.practitioner_id === sub && !j.final_diagnosis && ['graded', 'suggested'].includes(j.status)) {
+        if (j && j.session_id === session && !j.final_diagnosis && ['graded', 'suggested'].includes(j.status)) {
           Object.assign(j, { final_diagnosis: diagnosis, decided_at: new Date() });
           return { rows: [{ id, final_diagnosis: diagnosis, decided_at: j.decided_at }] };
         }
@@ -60,7 +51,7 @@ function fakeDb() {
       }
       if (q.startsWith('SELECT status, final_diagnosis FROM jobs')) {
         const j = jobs.get(params[0]);
-        return { rows: j && j.practitioner_id === params[1] ? [j] : [] };
+        return { rows: j && j.session_id === params[1] ? [j] : [] };
       }
       throw new Error(`fake db: unexpected query: ${q}`);
     },
@@ -76,10 +67,10 @@ function setup() {
   };
   const handler = createHandler(() => ({ db, presignUpload }));
 
-  const call = async (routeKey, { claims = ALICE, body, params } = {}) => {
+  const call = async (routeKey, { session = ALICE, body, params } = {}) => {
     const res = await handler({
       routeKey,
-      requestContext: { authorizer: claims ? { jwt: { claims } } : undefined },
+      headers: session === null ? {} : { 'x-trial-session': session },
       pathParameters: params,
       body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
     });
@@ -90,26 +81,12 @@ function setup() {
 
 const scanBody = { patientName: 'Pat Doe', patientMrn: 'MRN-1', contentType: 'image/jpeg' };
 
-test('unknown route is 404, missing token is 401', async () => {
+test('unknown route is 404; missing or malformed session is 400', async () => {
   const { call } = setup();
   assert.equal((await call('DELETE /jobs/{id}')).status, 404);
-  assert.equal((await call('GET /me', { claims: null })).status, 401);
-});
-
-test('GET /me creates the user from token claims once', async () => {
-  const { db, call } = setup();
-  const first = await call('GET /me');
-  assert.equal(first.status, 200);
-  assert.equal(first.body.first_name, 'Alice');
-  assert.equal(first.body.role, 'attending');
-  await call('GET /me');
-  assert.equal(db.users.size, 1);
-});
-
-test('unknown role claim falls back to clinician', async () => {
-  const { call } = setup();
-  const res = await call('GET /me', { claims: { ...BOB, 'custom:role': 'superadmin' } });
-  assert.equal(res.body.role, 'clinician');
+  assert.equal((await call('GET /me')).status, 404);
+  assert.equal((await call('GET /jobs', { session: null })).status, 400);
+  assert.equal((await call('GET /jobs', { session: 'abc' })).status, 400);
 });
 
 test('POST /scans creates patient and job, returns upload for the job key', async () => {
@@ -118,16 +95,24 @@ test('POST /scans creates patient and job, returns upload for the job key', asyn
   assert.equal(res.status, 201);
   const job = db.jobs.get(res.body.jobId);
   assert.equal(job.image_key, `scans/${res.body.jobId}.jpg`);
-  assert.equal(job.practitioner_id, ALICE.sub);
+  assert.equal(job.session_id, ALICE);
   assert.deepEqual(presigned, [{ key: job.image_key, contentType: 'image/jpeg' }]);
 });
 
-test('POST /scans reuses an existing patient by MRN', async () => {
+test('POST /scans reuses a patient by Patient ID within a session', async () => {
   const { db, call } = setup();
   await call('POST /scans', { body: scanBody });
   await call('POST /scans', { body: { ...scanBody, patientName: 'Typo Name' } });
   assert.equal(db.patients.size, 1);
-  assert.equal(db.patients.get('MRN-1').full_name, 'Pat Doe');
+  assert.equal(db.patients.get(`${ALICE}|MRN-1`).full_name, 'Pat Doe');
+});
+
+test('the same Patient ID in two sessions is two patients', async () => {
+  const { db, call } = setup();
+  const a = await call('POST /scans', { body: scanBody });
+  const b = await call('POST /scans', { body: scanBody, session: BOB });
+  assert.equal(db.patients.size, 2);
+  assert.notEqual(db.jobs.get(a.body.jobId).patient_id, db.jobs.get(b.body.jobId).patient_id);
 });
 
 test('POST /scans validates input', async () => {
@@ -139,13 +124,13 @@ test('POST /scans validates input', async () => {
   assert.equal((await call('POST /scans', { body: '[1]' })).status, 400);
 });
 
-test('jobs are only visible to their own clinician', async () => {
+test('jobs are only visible to their own session', async () => {
   const { call } = setup();
   const { body } = await call('POST /scans', { body: scanBody });
   const params = { id: body.jobId };
   assert.equal((await call('GET /jobs/{id}', { params })).status, 200);
-  assert.equal((await call('GET /jobs/{id}', { params, claims: BOB })).status, 404);
-  assert.equal((await call('GET /jobs', { claims: BOB })).body.jobs.length, 0);
+  assert.equal((await call('GET /jobs/{id}', { params, session: BOB })).status, 404);
+  assert.equal((await call('GET /jobs', { session: BOB })).body.jobs.length, 0);
   assert.equal((await call('GET /jobs')).body.jobs.length, 1);
   assert.equal((await call('GET /jobs/{id}', { params: { id: 'not-a-uuid' } })).status, 404);
 });
@@ -154,8 +139,8 @@ test('decision: rejected before grading, accepted once, then locked', async () =
   const { db, call } = setup();
   const { body } = await call('POST /scans', { body: scanBody });
   const params = { id: body.jobId };
-  const decide = (finalDiagnosis, claims = ALICE) =>
-    call('POST /jobs/{id}/decision', { params, claims, body: { finalDiagnosis } });
+  const decide = (finalDiagnosis, session = ALICE) =>
+    call('POST /jobs/{id}/decision', { params, session, body: { finalDiagnosis } });
 
   const early = await decide('Doctor Visit Required');
   assert.equal(early.status, 409);
@@ -174,7 +159,7 @@ test('decision: rejected before grading, accepted once, then locked', async () =
 
 test('unexpected errors return 500 without details', async () => {
   const handler = createHandler(() => ({ db: { query: async () => { throw new Error('connection refused'); } } }));
-  const res = await handler({ routeKey: 'GET /jobs', requestContext: { authorizer: { jwt: { claims: ALICE } } } });
+  const res = await handler({ routeKey: 'GET /jobs', headers: { 'x-trial-session': ALICE } });
   assert.equal(res.statusCode, 500);
   assert.deepEqual(JSON.parse(res.body), { error: 'Internal error' });
 });

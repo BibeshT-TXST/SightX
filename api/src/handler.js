@@ -1,11 +1,12 @@
 /**
  * SightX API Lambda entry point (API Gateway HTTP API, payload format 2.0).
  *
- * API Gateway's Cognito JWT authorizer verifies the ID token before this
- * runs, so the claims in the event are trusted. CORS is configured on the
- * HTTP API, not here.
+ * V2 is an open trial: there is no sign-in. The browser sends a random
+ * session ID in the X-Trial-Session header, and every route is scoped to
+ * it. Abuse is limited by API Gateway throttling, not here. CORS is also
+ * configured on the HTTP API.
  */
-import { routes, HttpError } from './routes.js';
+import { routes, HttpError, UUID_RE } from './routes.js';
 import { getDb } from './db.js';
 import { presignUpload } from './storage.js';
 
@@ -43,11 +44,14 @@ export function createHandler(getDeps = () => ({ db: getDb(), presignUpload })) 
     const route = routes[event.routeKey];
     if (!route) return respond(404, { error: 'Not found' });
 
-    const claims = event.requestContext?.authorizer?.jwt?.claims;
-    if (!claims?.sub) return respond(401, { error: 'Unauthorized' });
+    // HTTP API (payload 2.0) lowercases header names
+    const sessionId = event.headers?.['x-trial-session'];
+    if (!UUID_RE.test(sessionId ?? '')) {
+      return respond(400, { error: 'X-Trial-Session header must be a UUID' });
+    }
 
     try {
-      const req = { claims, params: event.pathParameters ?? {}, body: parseBody(event) };
+      const req = { sessionId, params: event.pathParameters ?? {}, body: parseBody(event) };
       const { status, body } = await route(req, getDeps());
       return respond(status, body);
     } catch (err) {
