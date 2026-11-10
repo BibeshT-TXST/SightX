@@ -9,6 +9,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 import torch
 import io
+import os
 import time
 from PIL import Image
 from collections import Counter
@@ -16,7 +17,14 @@ from collections import Counter
 # Local project modules
 from model import DRClassifier
 from preprocessing import inference_transforms, tta_transforms
-from clinical_postprocessor import classify_clinical_tier, GRADE_TO_TIER, TIER_LABELS
+from clinical_postprocessor import (
+    classify_clinical_tier,
+    aggregate_to_tiers,
+    risk_minimized_decision,
+    GRADE_TO_TIER,
+    TIER_LABELS,
+)
+import numpy as np
 
 
 # ── FastAPI Application Instance ─────────────────────────────────────────────
@@ -46,6 +54,16 @@ model.load_state_dict(torch.load('checkpoints/best_model.pt', map_location=DEVIC
 # Evaluation mode: Disables dropout and stabilizes BatchNorm
 model.eval()
 model.to(DEVICE)
+
+
+# ── Test-Time Augmentation Settings ──
+# TTA_PASSES:     total passes per image (pass 0 is the deterministic anchor)
+# TTA_BATCH_SIZE: passes per forward pass; lower it if the host runs out of memory
+TTA_PASSES = int(os.getenv('TTA_PASSES', '108'))
+TTA_BATCH_SIZE = int(os.getenv('TTA_BATCH_SIZE', '8'))
+
+if TTA_PASSES < 1 or TTA_BATCH_SIZE < 1:
+    raise ValueError('TTA_PASSES and TTA_BATCH_SIZE must be at least 1')
 
 
 # ── Human-Readable Grade Labels ─────────────────────────────────────────────
@@ -109,32 +127,44 @@ async def predict(file: UploadFile = File(...)):
     image = Image.open(io.BytesIO(contents)).convert('RGB')
 
     # ── 3. Base Image Loaded ─────────────────────────────────────────────
-    # We will apply transforms uniquely inside the 108 loop for Test-Time Augmentation.
+    # Transforms are applied per pass below for Test-Time Augmentation.
 
     # ── 4. Test-Time Augmentation (TTA) Ensemble ──
-    total_time_ms = 0
-    all_raw_grades, all_confidences = [], []
-    final_result = None
+    # Passes run TTA_BATCH_SIZE at a time: one forward pass over a batch is
+    # much cheaper than the same number of single-image passes.
+    all_raw_grades, all_confidences, all_grade_probs = [], [], []
 
     with torch.no_grad():
-        for i in range(108):
-            iter_start = time.time()
-            
-            # i=0: Anchor pass (deterministic); i>0: TTA passes (stochastic)
-            tensor = (inference_transforms(image) if i == 0 else tta_transforms(image)).unsqueeze(0).to(DEVICE)
-            
-            logits = model(tensor)
-            result = classify_clinical_tier(logits.cpu().numpy().flatten(), prior_mode='clinical')
-            
-            total_time_ms += (time.time() - iter_start) * 1000
-            all_raw_grades.append(result['raw_grade'])
-            all_confidences.append(result['confidence'])
-            final_result = result
+        for batch_start in range(0, TTA_PASSES, TTA_BATCH_SIZE):
+            batch_end = min(batch_start + TTA_BATCH_SIZE, TTA_PASSES)
+
+            # Pass 0: anchor (deterministic); later passes: TTA (stochastic)
+            batch = torch.stack([
+                inference_transforms(image) if i == 0 else tta_transforms(image)
+                for i in range(batch_start, batch_end)
+            ]).to(DEVICE)
+
+            batch_logits = model(batch).cpu().numpy()
+
+            for logits in batch_logits:
+                result = classify_clinical_tier(logits, prior_mode='clinical')
+                all_raw_grades.append(result['raw_grade'])
+                all_confidences.append(result['confidence'])
+                all_grade_probs.append(result['grade_probs'])
 
     # ── 5. Calculate Ensembled Metrics ───────────────────────────────────
-    avg_inference_time_ms = total_time_ms / 108.0
+    # Total wall-clock time for the whole request (the UI shows it as
+    # "Inference Time"), not the average of a single pass.
+    total_inference_time_ms = (time.time() - start_time) * 1000
     mode_raw_grade = Counter(all_raw_grades).most_common(1)[0][0]
     avg_confidence = sum(all_confidences) / len(all_confidences)
+
+    # Average the probabilities over every pass. Previously these came from
+    # the last pass only, a single random augmentation, so they could
+    # disagree with the ensemble tier reported alongside them.
+    mean_grade_probs = np.mean(all_grade_probs, axis=0)
+    mean_tier_probs = aggregate_to_tiers(mean_grade_probs)
+    _, mean_expected_costs = risk_minimized_decision(mean_tier_probs)
 
     # Map the ensemble mode_raw_grade directly to the semantic clinical tier
     ensemble_tier_id = GRADE_TO_TIER[mode_raw_grade]
@@ -150,21 +180,21 @@ async def predict(file: UploadFile = File(...)):
         
         # Detailed probability breakdown
         'tier_probabilities': {
-            'no_disease': final_result['tier_probs'][0],
-            'recommended': final_result['tier_probs'][1],
-            'required': final_result['tier_probs'][2],
+            'no_disease': round(float(mean_tier_probs[0]), 4),
+            'recommended': round(float(mean_tier_probs[1]), 4),
+            'required': round(float(mean_tier_probs[2]), 4),
         },
         'expected_costs': {
-            'no_disease': final_result['expected_costs'][0],
-            'recommended': final_result['expected_costs'][1],
-            'required': final_result['expected_costs'][2],
+            'no_disease': round(float(mean_expected_costs[0]), 2),
+            'recommended': round(float(mean_expected_costs[1]), 2),
+            'required': round(float(mean_expected_costs[2]), 2),
         },
         'grade_probabilities': {
-            f'grade_{i}': p for i, p in enumerate(final_result['grade_probs'])
+            f'grade_{i}': round(float(p), 4) for i, p in enumerate(mean_grade_probs)
         },
-        
+
         # Monte-carlo ensemble metrics
         'raw_model_grade': mode_raw_grade,
         'raw_model_grade_label': GRADE_LABELS[mode_raw_grade],
-        'inference_time_ms': round(avg_inference_time_ms, 2)
+        'inference_time_ms': round(total_inference_time_ms, 2)
     })
