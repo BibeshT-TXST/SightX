@@ -8,6 +8,10 @@ Everything in this document is defined in code: the application in `frontend/`, 
 
 ## 1. Architecture
 
+![SightX V2 architecture on AWS](./Docs/SightX_V2.png)
+
+The same design in more detail, with the connections labelled:
+
 ```mermaid
 flowchart LR
     B["Browser<br/>(random trial session ID)"]
@@ -175,7 +179,7 @@ The full runbook (first deploy, migrations, frontend sync, updates, logs, pausin
 
 ## 8. History: V1
 
-V1 ran as three Docker containers (React, an Express gateway, FastAPI) on institutional RHEL servers, with Supabase for authentication, row-level security and storage. It is preserved in git history and in [`Docs/SightX.png`](./Docs/SightX.png). [`Docs/SightX_V2.png`](./Docs/SightX_V2.png) is the original V2 planning sketch; the build changed it in places (an EC2 worker instead of a Lambda worker, no suggestion Lambda or Bedrock endpoint, S3 events feeding the queue, no Cognito), and the diagrams above reflect what is deployed.
+V1 ran as three Docker containers (React, an Express gateway, FastAPI) on institutional RHEL servers, with Supabase for authentication, row-level security and storage. It is preserved in git history and in [`Docs/SightX.png`](./Docs/SightX.png). The first V2 plan differed from what was built: it had a Lambda inference worker, a separate suggestion Lambda with a Bedrock endpoint, and Cognito sign-in. The reasons for each change are in the [decision records](./Docs/decisions/).
 
 ---
 *Documented for SightX Engineering*

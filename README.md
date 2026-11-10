@@ -14,17 +14,7 @@ Please see through the links for more info and backstory on SightX.
 
 V1 was about security: Supabase authentication, row-level security and institutional RHEL servers. **V2 is about cloud usability**: an open trial on AWS that anyone can try without signing in, built to stay up on its own and cost about $32 a month.
 
-```mermaid
-flowchart LR
-    B[Browser] -->|HTTPS| CF[CloudFront + S3]
-    B -->|REST| API[HTTP API → Lambda]
-    API --> DB[(RDS Postgres)]
-    B -->|presigned upload| S3[(S3 scans)]
-    S3 -->|ObjectCreated| Q[SQS queue]
-    Q --> W[EC2 worker<br/>ResNet-50 TTA]
-    W --> DB
-    W -->|suggestion| BR[Bedrock Nova Micro]
-```
+![SightX V2 architecture on AWS](./Docs/SightX_V2.png)
 
 1. Enter made-up patient details and upload a fundus image. It goes straight from the browser to S3.
 2. S3 queues the scan; a self-healing EC2 worker grades it with the 108-pass TTA ensemble.
