@@ -5,7 +5,6 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GavelIcon from '@mui/icons-material/Gavel';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
-import { useAuth } from '../../context/AuthContext';
 
 const SIDEBAR_WIDTH = 256;
 
@@ -29,23 +28,22 @@ const navLinkBase = {
 };
 
 /**
- * DashboardLayout component provides the primary authenticated shell for the application.
- * Includes a responsive sidebar, a sticky header with user profile, and a content area
+ * DashboardLayout component provides the primary shell for the trial.
+ * Includes a responsive sidebar, a sticky header, and a content area
  * with smooth page transitions.
- * 
+ *
  * @param {Object} props
  * @param {React.ReactNode} props.children - Inner page content to be rendered.
  */
 export default function DashboardLayout({ children }) {
-  const { logout, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   /**
-   * Performs the sign-out operation and redirects to the landing page.
+   * Leaves the trial for the landing page. The session is kept, so the
+   * visitor's scan history is still there when they come back.
    */
-  const handleSignOut = () => {
-    logout();
+  const handleExitTrial = () => {
     navigate('/');
   };
 
@@ -157,7 +155,7 @@ export default function DashboardLayout({ children }) {
           {/* Bottom Actions */}
           <Box sx={{ pt: 2, borderTop: '1px solid #f1f5f9' }}>
             <Box
-              onClick={handleSignOut}
+              onClick={handleExitTrial}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -184,7 +182,7 @@ export default function DashboardLayout({ children }) {
               }}
             >
               <LogoutIcon sx={{ fontSize: 16 }} />
-              <span>Sign Out</span>
+              <span>Exit Trial</span>
             </Box>
           </Box>
         </Box>
@@ -225,15 +223,15 @@ export default function DashboardLayout({ children }) {
                 letterSpacing: '0.12em',
               }}
             >
-              Diagnostic Terminal v1.0.0
+              Diagnostic Terminal v2.0.0
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#171c22' }}>
-                {profile ? `${profile.first_name} ${profile.last_name}` : 'Account holder Name'}
+                Guest Clinician
               </Typography>
-              <Typography sx={{ fontSize: '0.625rem', color: '#414755', textTransform: 'capitalize' }}>
-                {profile ? profile.role : 'Account holder Role'}
+              <Typography sx={{ fontSize: '0.625rem', color: '#414755' }}>
+                Trial mode · made-up patient data only
               </Typography>
             </Box>
           </Box>

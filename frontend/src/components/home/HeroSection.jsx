@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Typography, Button, Container, Grid, Chip } from '@mui/material';
-import { School, Lock, Analytics } from '@mui/icons-material';
+import { School, Info, Analytics } from '@mui/icons-material';
 import logo from '../../assets/logo.png';
 
 /**
@@ -57,23 +57,16 @@ const HeroSection = () => {
                 variant="contained"
                 color="primary"
                 component={Link}
-                to="/login"
-                sx={{ fontSize: '1.125rem' }}
-              >
-                Resident Login
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
+                to="/dashboard"
                 sx={{ fontSize: '1.125rem', px: 4 }}
               >
-                Request Access
+                Try It Out
               </Button>
             </Box>
 
             <Typography variant="caption" sx={{ mt: 4, color: 'text.secondary', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Lock sx={{ fontSize: '1rem' }} />
-              Restricted Access: This research tool is only accessible by trained medical professionals.
+              <Info sx={{ fontSize: '1rem' }} />
+              Open trial, no sign-in needed. Use made-up patient details only; results are not for clinical use.
             </Typography>
           </Grid>
 

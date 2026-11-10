@@ -7,8 +7,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-        - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY}
+        - VITE_API_URL=${VITE_API_URL}
     ports:
       - "80:80"
     restart: unless-stopped
