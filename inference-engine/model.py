@@ -13,11 +13,13 @@ from torchvision import models
 class DRClassifier(nn.Module):
     """ResNet50 backbone with a custom FC head for DR grading (V2)."""
 
-    def __init__(self, num_classes=5, freeze_backbone=True):
+    def __init__(self, num_classes=5, freeze_backbone=True, pretrained=True):
         super(DRClassifier, self).__init__()
 
-        # Load ResNet50 with pre-trained ImageNet weights
-        self.backbone = models.resnet50(weights='IMAGENET1K_V1')
+        # Load ResNet50 with pre-trained ImageNet weights for training.
+        # Inference passes pretrained=False: the trained checkpoint replaces
+        # every weight anyway, so the ~100 MB ImageNet download is wasted.
+        self.backbone = models.resnet50(weights='IMAGENET1K_V1' if pretrained else None)
 
         # Freeze backbone layers (preserve learned features)
         if freeze_backbone:

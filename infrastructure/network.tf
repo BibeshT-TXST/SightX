@@ -3,9 +3,9 @@
 # the Lamndas, no NAT gatweay. Private subnets have no route to the internet
 
 locals {
-    # Two Availability Zones (AZs) because RDS subnet group must span
-    # two, even for one instance
-    azs = ["us-east-2a", "us-east-2b"]
+  # Two Availability Zones (AZs) because RDS subnet group must span
+  # two, even for one instance
+  azs = ["us-east-2a", "us-east-2b"]
 }
 
 # ----------------------------
@@ -13,36 +13,36 @@ locals {
 # ----------------------------
 
 resource "aws_vpc" "main" {
-    cidr_block              = "10.0.0.0/16"
-    enable_dns_support      = true  # the VPC's DNS resolver answers queries
-    enable_dns_hostnames    = true  # needed for private DNS on the Bedrock endpoint
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true # the VPC's DNS resolver answers queries
+  enable_dns_hostnames = true # needed for private DNS on the Bedrock endpoint
 
-    tags = { Name = "sightx-vpc" }
+  tags = { Name = "sightx-vpc" }
 }
 
 resource "aws_subnet" "public_a" {
-    vpc_id                  = aws_vpc.main.id
-    cidr_block              = "10.0.0.0/24"
-    availability_zone       = local.azs[0]
-    map_public_ip_on_launch = true  # the worker gets a public IPv4 to reach  AWS APIs"
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.0.0/24"
+  availability_zone       = local.azs[0]
+  map_public_ip_on_launch = true # the worker gets a public IPv4 to reach  AWS APIs"
 
-    tags = { Name = "sightx-public-a" }
+  tags = { Name = "sightx-public-a" }
 }
 
 resource "aws_subnet" "private_a" {
-    vpc_id                  = aws_vpc.main.id
-    cidr_block              = "10.0.10.0/24"
-    availability_zone       = local.azs[0]
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.10.0/24"
+  availability_zone = local.azs[0]
 
-    tags = { Name = "sightx-private-a" }
+  tags = { Name = "sightx-private-a" }
 }
 
 resource "aws_subnet" "private_b" {
-    vpc_id                  = aws_vpc.main.id
-    cidr_block              = "10.0.11.0/24"
-    availability_zone       = local.azs[1]
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.11.0/24"
+  availability_zone = local.azs[1]
 
-    tags = { Name = "sightx-private-b" }
+  tags = { Name = "sightx-private-b" }
 }
 
 # ---------------------------------
@@ -50,20 +50,20 @@ resource "aws_subnet" "private_b" {
 # ---------------------------------
 
 resource "aws_internet_gateway" "main" {
-    vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main.id
 
-    tags = { Name = "sightx-igw"}
+  tags = { Name = "sightx-igw" }
 }
 
 resource "aws_route_table" "public" {
-    vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main.id
 
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.main.id 
-    }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
 
-    tags = { Name = "sightx-public-rt" }
+  tags = { Name = "sightx-public-rt" }
 }
 
 resource "aws_route_table_association" "public_a" {
@@ -113,25 +113,25 @@ resource "aws_vpc_endpoint" "s3" {
 
 # Strip every rule from the VPC's default security group so nothing can use it 
 resource "aws_default_security_group" "default" {
-    vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.main.id
 
-    tags = { Name = "sightx-default-unused" }
+  tags = { Name = "sightx-default-unused" }
 }
 
 resource "aws_security_group" "lambda" {
-    name            = "sightx-lambda"
-    description     = "VPC Lambdas: no inbound, all outbound"
-    vpc_id          = aws_vpc.main.id
+  name        = "sightx-lambda"
+  description = "VPC Lambdas: no inbound, all outbound"
+  vpc_id      = aws_vpc.main.id
 
-    tags = { Name = "sightx-lambda" }
+  tags = { Name = "sightx-lambda" }
 }
 
 resource "aws_security_group" "worker" {
-    name            = "sightx-worker"
-    description     = "EC2 inference worker: no inbound, all outbound"
-    vpc_id          = aws_vpc.main.id
+  name        = "sightx-worker"
+  description = "EC2 inference worker: no inbound, all outbound"
+  vpc_id      = aws_vpc.main.id
 
-    tags = { Name = "sightx-worker" }
+  tags = { Name = "sightx-worker" }
 }
 
 resource "aws_security_group" "rds" {

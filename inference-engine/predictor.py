@@ -48,7 +48,9 @@ else:
 # repo checkout (for example, a file downloaded from S3 at startup).
 MODEL_WEIGHTS_PATH = os.getenv('MODEL_WEIGHTS_PATH', 'checkpoints/best_model.pt')
 
-model = DRClassifier(num_classes=5)
+# pretrained=False: the checkpoint below overwrites every weight, so skip
+# downloading the ImageNet ones (no network access needed at startup)
+model = DRClassifier(num_classes=5, pretrained=False)
 
 # Load weights and map to the designated accelerator (CUDA, MPS, or CPU)
 model.load_state_dict(torch.load(MODEL_WEIGHTS_PATH, map_location=DEVICE))
