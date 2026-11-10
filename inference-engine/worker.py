@@ -7,7 +7,13 @@ an image the browser uploaded with a presigned URL. For each one the worker:
   1. finds the job row by its S3 key and claims it (status → processing)
   2. downloads the image and runs predictor.predict()
   3. writes the result (status → graded) and commits
-  4. deletes the message, only after the commit
+  4. asks Bedrock for a suggestion and stores it (status → suggested)
+  5. deletes the message, only after the commits
+
+The suggestion is optional: if Bedrock fails, the job stays graded and the
+clinician still sees the AI result. Bedrock only ever sees the current
+result and the patient's earlier results (dates, tiers, decisions), read
+with a fixed parameterized query. It never sees names, IDs or SQL.
 
 Failure handling:
   • unreadable image  → job failed, message deleted (a retry cannot help)
@@ -26,6 +32,8 @@ Configuration (environment variables):
   DB_SSLMODE            default require (IAM auth needs TLS)
   MODEL_WEIGHTS_S3_URI  optional s3://bucket/key; downloaded to
                         MODEL_WEIGHTS_PATH before the model loads
+  BEDROCK_MODEL_ID      model or inference profile for suggestions
+                        (default us.amazon.nova-micro-v1:0); empty disables them
 """
 
 import json
@@ -38,6 +46,7 @@ from urllib.parse import unquote_plus
 
 import boto3
 import psycopg
+from botocore.config import Config
 from psycopg.types.json import Jsonb
 
 logging.basicConfig(
@@ -69,9 +78,19 @@ MAX_IMAGE_BYTES = 20 * 1024 * 1024
 # Pause before polling again after SQS itself could not be reached
 RECEIVE_RETRY_SECONDS = 5
 
+# Cheapest Bedrock text model at the time of writing. The "us." prefix is a
+# cross-region inference profile, which Nova requires for on-demand calls.
+BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID', 'us.amazon.nova-micro-v1:0')
+HISTORY_LIMIT = 10          # earlier scans included in the prompt
+SUGGESTION_MAX_TOKENS = 300
+
 sqs = boto3.client('sqs', region_name=REGION)
 s3 = boto3.client('s3', region_name=REGION)
 rds = boto3.client('rds', region_name=REGION)
+# Short timeouts: a slow suggestion must not hold the queue message for long
+bedrock = boto3.client('bedrock-runtime', region_name=REGION, config=Config(
+    connect_timeout=5, read_timeout=30, retries={'max_attempts': 2},
+))
 
 
 # ── Model weights ────────────────────────────────────────────────────────────
@@ -157,6 +176,100 @@ def save_failure(conn: psycopg.Connection, job_id, error: str, final: bool) -> N
     conn.commit()
 
 
+# ── Bedrock suggestion ───────────────────────────────────────────────────────
+SUGGESTION_SYSTEM_PROMPT = """\
+You assist an ophthalmology clinician reviewing an AI diabetic retinopathy \
+screening result. You do not diagnose; the clinician makes the final decision.
+
+Given the current AI result and the patient's earlier screening results, write \
+at most 4 short sentences in plain text that:
+- note whether the result is consistent with the patient's history or a change from it
+- point out low confidence or disagreement between earlier AI results and clinician decisions
+- suggest follow-up questions to ask the patient or further tests worth considering
+
+Use only the data provided. If there is no history, say so in one sentence."""
+
+
+def load_history(conn: psycopg.Connection, job_id) -> list:
+    """
+    Earlier finished scans of the same patient, newest first.
+
+    Fixed, parameterized query: the model never writes or sees SQL, and
+    only dates, AI tiers and clinician decisions leave the database.
+    """
+    return conn.execute(
+        """
+        SELECT earlier.created_at, earlier.ai_diagnosis, earlier.final_diagnosis
+          FROM jobs AS current
+          JOIN jobs AS earlier ON earlier.patient_id = current.patient_id
+         WHERE current.id = %s
+           AND earlier.id <> current.id
+           AND earlier.status IN ('graded', 'suggested')
+         ORDER BY earlier.created_at DESC
+         LIMIT %s
+        """,
+        (job_id, HISTORY_LIMIT),
+    ).fetchall()
+
+
+def build_prompt(result: dict, history: list) -> str:
+    probs = result['tier_probabilities']
+    lines = [
+        'Current AI result:',
+        f'- Tier: {result["tier"]}',
+        f'- Most common model grade: {result["raw_model_grade_label"]}',
+        f'- Confidence: {result["confidence"]:.2f}',
+        f'- Tier probabilities: no disease {probs["no_disease"]:.2f}, '
+        f'visit recommended {probs["recommended"]:.2f}, visit required {probs["required"]:.2f}',
+        '',
+        'Earlier results (newest first):',
+    ]
+    if not history:
+        lines.append('- none')
+    for created_at, ai_diagnosis, final_diagnosis in history:
+        decision = final_diagnosis or 'no decision recorded'
+        lines.append(f'- {created_at:%Y-%m-%d}: AI {ai_diagnosis}; clinician {decision}')
+    return '\n'.join(lines)
+
+
+def suggest(conn: psycopg.Connection, job_id, result: dict) -> None:
+    """
+    Ask Bedrock for a suggestion and store it. Never raises: any failure is
+    logged and the job stays graded.
+    """
+    if not BEDROCK_MODEL_ID:
+        return
+    try:
+        prompt = build_prompt(result, load_history(conn, job_id))
+        response = bedrock.converse(
+            modelId=BEDROCK_MODEL_ID,
+            system=[{'text': SUGGESTION_SYSTEM_PROMPT}],
+            messages=[{'role': 'user', 'content': [{'text': prompt}]}],
+            inferenceConfig={'maxTokens': SUGGESTION_MAX_TOKENS, 'temperature': 0.2},
+        )
+        text = ''.join(
+            block.get('text', '') for block in response['output']['message']['content']
+        ).strip()
+        if not text:
+            raise ValueError('empty response')
+
+        conn.execute(
+            """
+            UPDATE jobs
+               SET status = 'suggested', suggestion = %s,
+                   suggestion_model = %s, suggested_at = now()
+             WHERE id = %s AND status = 'graded'
+            """,
+            (text, BEDROCK_MODEL_ID, job_id),
+        )
+        conn.commit()
+        log.info('job %s: suggestion stored (%d output tokens)',
+                 job_id, response.get('usage', {}).get('outputTokens', 0))
+    except Exception:
+        conn.rollback()
+        log.exception('job %s: suggestion failed; job stays graded', job_id)
+
+
 # ── Message handling ─────────────────────────────────────────────────────────
 def parse_s3_records(body: str) -> list:
     """
@@ -209,6 +322,8 @@ def grade(bucket: str, key: str, receive_count: int) -> bool:
         save_result(conn, job_id, result)
         log.info('job %s: graded as %s in %.0f ms',
                  job_id, result['tier'], result['inference_time_ms'])
+
+        suggest(conn, job_id, result)
         return True
 
 
