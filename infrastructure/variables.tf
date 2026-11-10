@@ -92,3 +92,11 @@ variable "bedrock_model_id" {
     error_message = "Use a US cross-region inference profile ID (us.<model-id>); the worker's IAM policy is written for one."
   }
 }
+
+# ── Monitoring ───────────────────────────────────────────────────────────────
+
+variable "alarm_sns_topic_arn" {
+  description = "Existing SNS topic to notify when scans land in the dead-letter queue. Empty creates no alarm."
+  type        = string
+  default     = ""
+}
