@@ -1,0 +1,91 @@
+#!/bin/bash
+# SightX worker bootstrap (cloud-init runs this once, at first boot).
+# Rendered by Terraform: ${"$"}{...} placeholders are filled in by worker.tf.
+#
+# Installs the inference worker from the public GitHub repo (no Docker
+# image or ECR), then runs it as a systemd service that restarts on crash.
+# Log of this script: /var/log/sightx-bootstrap.log
+# Worker logs:        journalctl -u sightx-worker -f
+set -euxo pipefail
+exec > >(tee -a /var/log/sightx-bootstrap.log) 2>&1
+
+# ── Swap: headroom for pip installing torch and for inference on 2 GiB ──
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=2048
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+# ── Packages: git, Python, and the psql client for running migrations ──
+dnf install -y git python3.11 python3.11-pip postgresql16
+
+id sightx >/dev/null 2>&1 || useradd --system --create-home --home-dir /opt/sightx sightx
+
+# ── Worker configuration (read by systemd and by sightx-update) ──
+cat > /etc/sightx-worker.env <<'ENV'
+%{ for key, value in worker_env ~}
+${key}=${value}
+%{ endfor ~}
+ENV
+chmod 640 /etc/sightx-worker.env
+chown root:sightx /etc/sightx-worker.env
+
+cat > /etc/sightx-source.conf <<'CONF'
+GIT_URL=${git_url}
+GIT_REF=${git_ref}
+CONF
+
+# ── sightx-update: fetch the code, install dependencies, restart ──
+# Run it again over SSM to deploy new commits on the same ref.
+cat > /usr/local/bin/sightx-update <<'UPDATE'
+#!/bin/bash
+set -euo pipefail
+source /etc/sightx-source.conf
+REPO=/opt/sightx/repo
+VENV=/opt/sightx/venv
+
+if [ -d "$REPO/.git" ]; then
+  git -C "$REPO" fetch --depth 1 origin "$GIT_REF"
+  git -C "$REPO" checkout --force FETCH_HEAD
+else
+  git clone --depth 1 --branch "$GIT_REF" "$GIT_URL" "$REPO"
+fi
+
+[ -d "$VENV" ] || python3.11 -m venv "$VENV"
+"$VENV/bin/pip" install --quiet --upgrade pip
+# CPU-only torch first (same as the Dockerfile and CI): no CUDA wheels
+"$VENV/bin/pip" install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
+"$VENV/bin/pip" install --quiet -r "$REPO/inference-engine/requirements-worker.txt"
+
+chown -R sightx:sightx /opt/sightx
+systemctl restart sightx-worker 2>/dev/null || true
+echo "sightx-update: running $(git -C "$REPO" rev-parse --short HEAD) from $GIT_REF"
+UPDATE
+chmod 755 /usr/local/bin/sightx-update
+
+# ── systemd service ──
+cat > /etc/systemd/system/sightx-worker.service <<'UNIT'
+[Unit]
+Description=SightX inference worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=sightx
+WorkingDirectory=/opt/sightx/repo/inference-engine
+EnvironmentFile=/etc/sightx-worker.env
+ExecStart=/opt/sightx/venv/bin/python worker.py
+Restart=always
+RestartSec=10
+# SIGTERM lets worker.py finish the current job; give it the job timeout
+TimeoutStopSec=${stop_timeout_seconds}
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+/usr/local/bin/sightx-update
+systemctl daemon-reload
+systemctl enable --now sightx-worker

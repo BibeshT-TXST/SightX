@@ -4,6 +4,8 @@
 **Region:** `us-east-2` (Ohio)
 **AWS account:** `142366489647`
 
+> **Later change (November 2026):** the Bedrock interface endpoint and the `sightx-endpoints` security group planned below were dropped; Bedrock calls moved to the EC2 worker. This log is kept as written. See [decision 01](../decisions/01-vpc-networking.md) and [decision 06](../decisions/06-worker.md).
+
 This is the first real infrastructure for SightX on AWS. By the end of the session the account had a private network (a VPC) with one public subnet for the future inference worker, two private subnets for the future database and Lambdas, the routing that decides which of them can reach the internet, a free private path to S3, and the four firewalls (security groups) that later steps attach to their resources. Nothing that runs code exists yet, so this step costs $0 a month.
 
 ## What I did, in order

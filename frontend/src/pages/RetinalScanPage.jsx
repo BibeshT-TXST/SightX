@@ -8,24 +8,53 @@ import HelpIcon from '@mui/icons-material/Help';
 import PrintIcon from '@mui/icons-material/Print';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { TextField, MenuItem } from '@mui/material';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import {
+  ACCEPTED_IMAGE_TYPES,
+  MAX_IMAGE_BYTES,
+  createScan,
+  uploadScan,
+  waitForJob,
+  recordDecision,
+} from '../lib/api';
+
+// Status line shown while a scan moves through the pipeline
+const STAGE_LABELS = {
+  uploading: 'Uploading scan...',
+  queued: 'Waiting for the inference worker...',
+  processing: 'Grading scan...',
+};
 
 /**
  * RetinalScanPage is the core diagnostic interface of SightX.
- * Handles image uploads, AI inference requests, and clinical verification persistence.
+ *
+ * Flow: enter patient details → upload (browser → S3) → the worker grades
+ * the scan → this page polls the job → confirm a final diagnosis.
  */
 export default function RetinalScanPage() {
 
-  const { session, profile } = useAuth(); // Assume session and profile exist
   const [patientName, setPatientName] = useState('');
   const [patientId, setPatientId] = useState('');
   const [finalDiagnosis, setFinalDiagnosis] = useState('');
 
-  const [scanResult, setScanResult] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [job, setJob] = useState(null);          // latest GET /jobs/{id} response
+  const [stage, setStage] = useState(null);      // uploading | queued | processing
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const fileInputRef = useRef(null);
+  const cancelledRef = useRef(false);
+  const activeJobIdRef = useRef(null);  // polls for any other job stop updating the page
+
+  // The AI result has the same shape the page has always rendered
+  const scanResult = job && (job.status === 'graded' || job.status === 'suggested') ? job.result : null;
+  const isProcessing = stage !== null;
+  const hasPatientDetails = patientName.trim() !== '' && patientId.trim() !== '';
+
+  // Stop polling when the page unmounts
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => { cancelledRef.current = true; };
+  }, []);
 
   // Auto-populate the Final Diagnosis field with the AI's prediction
   useEffect(() => {
@@ -34,53 +63,75 @@ export default function RetinalScanPage() {
     }
   }, [scanResult]);
 
+  const resetForNextPatient = () => {
+    activeJobIdRef.current = null;
+    setJob(null);
+    setPatientName('');
+    setPatientId('');
+    setFinalDiagnosis('');
+  };
+
   const handleConfirmScan = async () => {
-    const { error } = await supabase
-      .from('patient_scans')
-      .insert([
-        {
-          patient_name: patientName,
-          patient_id: patientId,
-          practitioner_id: session.user.id, // Implicit tracking
-          clinician_name: `${profile.first_name} ${profile.last_name}`,
-          ai_diagnosis: scanResult.tier,
-          final_diagnosis: finalDiagnosis
-        }
-      ]);
-    if (!error) {
+    setIsSaving(true);
+    setErrorMsg('');
+    try {
+      await recordDecision(job.id, finalDiagnosis);
       setIsSuccess(true);
-      // Reset everything for the next patient
-      setScanResult(null);
-      setPatientName('');
-      setPatientId('');
-      setFinalDiagnosis('');
+      resetForNextPatient();
 
       // Clear the success message after 3 seconds
       setTimeout(() => {
         setIsSuccess(false);
       }, 3000);
-    } else {
-      console.error('Save failed:', error);
+    } catch (error) {
+      setErrorMsg(error.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const processFile = async (file) => {
-    if (!file) return;
-    setIsProcessing(true);
-    const formData = new FormData();
-    formData.append('image', file);
+    if (!file || isProcessing) return;
+    setErrorMsg('');
+
+    if (!hasPatientDetails) {
+      setErrorMsg('Enter the patient name and ID before uploading.');
+      return;
+    }
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      setErrorMsg('Only JPEG and PNG images are accepted.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setErrorMsg('Images must be 20 MB or smaller.');
+      return;
+    }
+
     try {
-      // Send to our Node.js Backend API
-      const response = await fetch('http://localhost:5001/api/scan/upload', {
-        method: 'POST',
-        body: formData,
+      setStage('uploading');
+      const { jobId, upload } = await createScan({
+        patientName: patientName.trim(),
+        patientMrn: patientId.trim(),
+        contentType: file.type,
       });
-      const data = await response.json();
-      setScanResult(data);
+      await uploadScan(upload, file);
+
+      setStage('queued');
+      activeJobIdRef.current = jobId;
+      await waitForJob(jobId, {
+        isCancelled: () => cancelledRef.current || activeJobIdRef.current !== jobId,
+        onUpdate: (latest) => {
+          setJob(latest);
+          if (latest.status === 'queued' || latest.status === 'processing') setStage(latest.status);
+        },
+      });
     } catch (error) {
-      console.error('Upload failed:', error);
+      activeJobIdRef.current = null;
+      setJob(null);
+      setErrorMsg(error.message);
     } finally {
-      setIsProcessing(false);
+      setStage(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -99,6 +150,17 @@ export default function RetinalScanPage() {
       processFile(event.dataTransfer.files[0]);
       event.dataTransfer.clearData();
     }
+  };
+
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '0.625rem',
+      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+        borderColor: '#0057c0',
+        borderWidth: 2,
+      },
+    },
+    '& .MuiInputLabel-root.Mui-focused': { color: '#0057c0' },
   };
 
   return (
@@ -165,13 +227,50 @@ export default function RetinalScanPage() {
         >
           {/* Upload Zone / Confirmation Form */}
           {!scanResult ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Patient details: needed before upload so the scan joins the patient's history */}
             <Box
-              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 2,
+                p: 2.5,
+                bgcolor: '#ffffff',
+                borderRadius: '0.75rem',
+                border: '1px solid #e2e8f0',
+              }}
+            >
+              <TextField
+                fullWidth
+                label="Patient Full Name"
+                variant="outlined"
+                value={patientName}
+                disabled={isProcessing}
+                onChange={(e) => setPatientName(e.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                fullWidth
+                label="Patient / Medical ID"
+                variant="outlined"
+                value={patientId}
+                disabled={isProcessing}
+                onChange={(e) => setPatientId(e.target.value)}
+                sx={fieldSx}
+              />
+              <Typography sx={{ gridColumn: '1 / -1', fontSize: '0.75rem', color: '#64748b' }}>
+                Trial mode: please use made-up patient details only.
+              </Typography>
+            </Box>
+            <Box
+              onClick={() => (hasPatientDetails
+                ? fileInputRef.current?.click()
+                : setErrorMsg('Enter the patient name and ID before uploading.'))}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
               sx={{
                 position: 'relative',
-                minHeight: 480,
+                minHeight: 380,
                 borderRadius: '0.75rem',
                 border: '2px dashed',
                 borderColor: '#c1c6d7',
@@ -231,14 +330,20 @@ export default function RetinalScanPage() {
                   )}
                 </Box>
                 <Typography sx={{ fontSize: '1.5rem', fontWeight: 700, color: isSuccess ? '#00685f' : '#171c22', mb: 0.5 }}>
-                  {isProcessing ? 'Processing Scan...' : isSuccess ? 'Patient Record Saved!' : 'Upload Fundus Image'}
+                  {isProcessing ? STAGE_LABELS[stage] : isSuccess ? 'Patient Record Saved!' : 'Upload Fundus Image'}
                 </Typography>
-                <Typography sx={{ color: '#414755', fontSize: '0.875rem', mb: 3 }}>
-                  {isSuccess ? 'Database successfully synced.' : 'Drag and drop high resolution clinical exports'}
+                <Typography sx={{ color: errorMsg ? '#dc2626' : '#414755', fontSize: '0.875rem', mb: 3, px: 3 }}>
+                  {errorMsg
+                    || (isSuccess
+                      ? 'Final diagnosis recorded.'
+                      : hasPatientDetails
+                        ? 'Drag and drop a JPEG or PNG fundus image (max 20 MB)'
+                        : 'Enter the patient details above to enable upload')}
                 </Typography>
-                {!isSuccess && (
+                {!isSuccess && !isProcessing && (
                   <Button
                     variant="contained"
+                    disabled={!hasPatientDetails}
                     sx={{
                       px: 4,
                       py: 1.5,
@@ -253,6 +358,7 @@ export default function RetinalScanPage() {
                   </Button>
                 )}
               </Box>
+            </Box>
             </Box>
           ) : (
             <Box
@@ -364,42 +470,44 @@ export default function RetinalScanPage() {
                   </Box>
                 )}
 
+                {/* Patient (fixed once the scan is created) */}
+                <Box sx={{ display: 'flex', gap: 3, mb: 2.5 }}>
+                  {[
+                    { label: 'Patient', value: job.patient_name },
+                    { label: 'Patient ID', value: job.patient_mrn },
+                  ].map((item) => (
+                    <Box key={item.label}>
+                      <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        {item.label}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.875rem', fontWeight: 600, color: '#171c22' }}>
+                        {item.value}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                {/* Bedrock suggestion (optional; arrives shortly after grading) */}
+                <Box
+                  sx={{
+                    p: 2,
+                    mb: 3,
+                    borderRadius: '0.625rem',
+                    bgcolor: 'rgba(124,58,237,0.04)',
+                    border: '1px solid rgba(124,58,237,0.15)',
+                  }}
+                >
+                  <Typography sx={{ fontSize: '0.6875rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+                    AI Suggestion
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.8125rem', color: '#414755', lineHeight: 1.6 }}>
+                    {job.suggestion
+                      ?? (job.status === 'graded' ? 'Generating suggestion...' : 'No suggestion available for this scan.')}
+                  </Typography>
+                </Box>
+
                 {/* Form Fields */}
                 <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField
-                    fullWidth
-                    label="Patient Full Name"
-                    variant="outlined"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '0.625rem',
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#0057c0',
-                          borderWidth: 2,
-                        },
-                      },
-                      '& .MuiInputLabel-root.Mui-focused': { color: '#0057c0' },
-                    }}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Patient / Medical ID"
-                    variant="outlined"
-                    value={patientId}
-                    onChange={(e) => setPatientId(e.target.value)}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '0.625rem',
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#0057c0',
-                          borderWidth: 2,
-                        },
-                      },
-                      '& .MuiInputLabel-root.Mui-focused': { color: '#0057c0' },
-                    }}
-                  />
                   <TextField
                     select
                     fullWidth
@@ -407,16 +515,7 @@ export default function RetinalScanPage() {
                     variant="outlined"
                     value={finalDiagnosis}
                     onChange={(e) => setFinalDiagnosis(e.target.value)}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: '0.625rem',
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: '#0057c0',
-                          borderWidth: 2,
-                        },
-                      },
-                      '& .MuiInputLabel-root.Mui-focused': { color: '#0057c0' },
-                    }}
+                    sx={fieldSx}
                   >
                     <MenuItem value="Doctor Visit Optional">Doctor Visit Optional</MenuItem>
                     <MenuItem value="Doctor Visit Required">Doctor Visit Required</MenuItem>
@@ -429,7 +528,7 @@ export default function RetinalScanPage() {
                   fullWidth
                   variant="contained"
                   onClick={handleConfirmScan}
-                  disabled={!patientName || !patientId}
+                  disabled={!finalDiagnosis || isSaving}
                   sx={{
                     mt: 3,
                     py: 1.75,
@@ -452,8 +551,13 @@ export default function RetinalScanPage() {
                     },
                   }}
                 >
-                  Save Patient Record
+                  {isSaving ? 'Saving...' : 'Save Patient Record'}
                 </Button>
+                {errorMsg && (
+                  <Typography sx={{ mt: 1.5, fontSize: '0.8125rem', color: '#dc2626', textAlign: 'center' }}>
+                    {errorMsg}
+                  </Typography>
+                )}
 
                 {/* Disclaimer */}
                 <Typography

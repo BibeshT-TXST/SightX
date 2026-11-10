@@ -11,9 +11,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   frontend-check:
-    name: Frontend (React) Compatibility
+    name: Frontend (React) Lint & Build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,39 +26,47 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22' # Vite 7 needs Node 20.19+
           cache: 'npm'
           cache-dependency-path: './frontend/package-lock.json'
-      
+
       - name: Install Dependencies
         run: npm ci
-        
+
+      - name: Lint
+        run: npm run lint
+
       - name: Verify Build
         run: npm run build
+        env:
+          VITE_API_URL: https://ci.invalid # placeholder; the real URL is set at deploy
 
-  backend-check:
-    name: Backend (Express) Compatibility
+  api-check:
+    name: API (Lambda) Tests
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: ./api
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # matches the Lambda runtime
           cache: 'npm'
-          cache-dependency-path: './backend/package-lock.json'
-      
+          cache-dependency-path: './api/package-lock.json'
+
       - name: Install Dependencies
         run: npm ci
-        
-      - name: Syntax Check Gateway
-        run: node -c index.js
+
+      - name: Syntax Check
+        run: npm run check
+
+      - name: Unit Tests
+        run: npm test
 
   inference-check:
-    name: Inference (FastAPI/PyTorch) Compatibility
+    name: Inference Engine & Worker Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,12 +76,46 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.10' # matches the Docker image
           cache: 'pip'
-          
+          cache-dependency-path: |
+            inference-engine/requirements.txt
+            inference-engine/requirements-worker.txt
+
+      # Same order as the Dockerfile: CPU-only torch first, so pip does not
+      # pull the multi-GB CUDA wheels
       - name: Install Dependencies
-        # Using a caching mechanism via setup-python to keep things blazing fast
-        run: pip install -r requirements.txt
-        
-      - name: Syntax Check Model API
-        run: python -m py_compile main.py
+        run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-worker.txt
+
+      - name: Syntax Check
+        run: python -m py_compile main.py predictor.py worker.py model.py preprocessing.py clinical_postprocessor.py temperature_calibration.py
+
+      # Separate processes: the worker test replaces predictor with a stub
+      - name: Worker Tests
+        run: python -m unittest -v tests.test_worker
+
+      - name: Predictor Smoke Test (real model, CPU)
+        run: python -m unittest -v tests.test_predictor
+
+  terraform-check:
+    name: Terraform Format & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.10.5'
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff infrastructure
+
+      # -backend=false: validate without touching the state bucket or AWS
+      - name: Validate (main stack)
+        working-directory: ./infrastructure
+        run: terraform init -backend=false -input=false && terraform validate
+
+      - name: Validate (bootstrap)
+        working-directory: ./infrastructure/bootstrap
+        run: terraform init -backend=false -input=false && terraform validate

@@ -1,6 +1,6 @@
 # Contributing to SightX
 
-Thank you for your interest in contributing to **SightX** — a diabetic retinopathy detection system built with clinical AI, React, and Supabase. Whether you're fixing a bug, improving documentation, or proposing a new feature, every contribution helps advance accessible eye care.
+Thank you for your interest in contributing to **SightX** — a diabetic retinopathy detection system built with clinical AI, React, and AWS. Whether you're fixing a bug, improving documentation, or proposing a new feature, every contribution helps advance accessible eye care.
 
 Please take a moment to read through these guidelines before submitting your work.
 
@@ -34,61 +34,64 @@ This project adheres to the [Contributor Covenant Code of Conduct](./CODE_OF_CON
 
 | Tool | Version | Purpose |
 | :--- | :--- | :--- |
-| **Node.js** | 18+ | Frontend & Backend |
-| **Python** | 3.10+ | Inference Engine |
-| **Docker** | Latest | Full-stack orchestration |
-| **Supabase Account** | Free tier | Auth & database |
+| **Node.js** | 22 | Frontend & API |
+| **Python** | 3.10+ | Inference engine & worker |
+| **Docker** | Latest | Optional: local Postgres for migrations, inference image |
+| **Terraform** | 1.10+ | Only for infrastructure changes |
 
 ### Local Setup
 
 1. **Fork & clone** the repository:
    ```bash
-   git clone https://github.com/<your-username>/Project-SightX.git
-   cd Project-SightX
+   git clone https://github.com/<your-username>/SightX.git
+   cd SightX
    ```
 
-2. **Set up environment variables** — create a `.env` file in the project root:
-   ```bash
-   VITE_SUPABASE_URL=your_project_url
-   VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_public_key
-   ```
-
-3. **Run with Docker** (recommended):
-   ```bash
-   docker-compose up --build
-   ```
-
-4. **Or run individual services**:
+2. **Run each part's checks** (the same ones CI runs):
    ```bash
    # Frontend (Vite + React)
-   cd frontend && npm install && npm run dev
+   cd frontend && npm ci && npm run lint && npm run build
 
-   # Backend (Express)
-   cd backend && npm install && npm run dev
+   # API (Lambda handlers)
+   cd api && npm ci && npm test
 
-   # Inference Engine (FastAPI + PyTorch)
-   cd inference-engine && pip install -r requirements.txt && uvicorn app.main:app --reload
+   # Inference engine & worker (CPU-only torch keeps the install small)
+   cd inference-engine
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+   pip install -r requirements-worker.txt
+   python -m unittest tests.test_worker
+   python -m unittest tests.test_predictor
+
+   # Infrastructure
+   terraform fmt -check -recursive infrastructure
    ```
 
+3. **Run the app**:
+   - **Frontend**: put `VITE_API_URL=<deployed API URL>` in `frontend/.env.local`, then `npm run dev`.
+   - **Model only**: `cd inference-engine && uvicorn main:app --reload`, then POST an image to `/predict`.
+   - **Database**: [db/README.md](./db/README.md) runs the migrations against a throwaway Postgres container.
+
 > [!TIP]
-> See the [main README](./README.md) for the full Supabase setup guide, including schema creation, auth configuration, and superuser bootstrapping.
+> Deploying your own copy to AWS is covered step by step in the [Infrastructure README](./infrastructure/README.md).
 
 ---
 
 ## Project Structure
 
 ```
-Project-SightX/
-├── frontend/          # React + Vite clinical interface
+SightX/
+├── frontend/          # React + Vite trial interface
 │   └── src/
 │       ├── components/    # Reusable UI components
-│       ├── context/       # Auth & state providers
-│       ├── lib/           # Supabase client
+│       ├── lib/           # API client and trial session
 │       └── pages/         # Route-level page components
-├── backend/           # Express API gateway
-├── inference-engine/  # FastAPI + PyTorch AI engine
-├── Docs/              # Architecture diagrams & assets
-└── docker-compose.yml # Full-stack orchestration
+├── api/               # Lambda handlers behind the HTTP API
+├── inference-engine/  # PyTorch model, SQS worker, local FastAPI server
+│   └── tests/             # Worker and predictor tests
+├── db/                # PostgreSQL migrations
+├── infrastructure/    # Terraform for every AWS resource
+├── Docs/              # Diagrams, decision records, build logs
+└── .github/           # CI workflow and issue templates
 ```
 
 ---
@@ -97,7 +100,7 @@ Project-SightX/
 
 1. **Create a branch** from `main` (see [Branch Naming Convention](#branch-naming-convention)).
 2. **Make your changes** in focused, atomic commits.
-3. **Test locally** — ensure the app runs without errors.
+3. **Test locally** — run the checks for every part you touched (see [Local Setup](#local-setup)); CI runs them all on your PR.
 4. **Push your branch** and open a Pull Request against `main`.
 
 ---
@@ -109,10 +112,10 @@ Use the following prefixes for your branches:
 | Prefix | Purpose | Example |
 | :--- | :--- | :--- |
 | `feature/` | New features or enhancements | `feature/scan-history-export` |
-| `fix/` | Bug fixes | `fix/login-redirect-loop` |
-| `docs/` | Documentation updates | `docs/supabase-setup-guide` |
-| `refactor/` | Code restructuring (no behavior change) | `refactor/auth-context-cleanup` |
-| `chore/` | Tooling, CI, or config changes | `chore/docker-compose-update` |
+| `fix/` | Bug fixes | `fix/scan-poll-timeout` |
+| `docs/` | Documentation updates | `docs/deploy-runbook` |
+| `refactor/` | Code restructuring (no behavior change) | `refactor/worker-retry-logic` |
+| `chore/` | Tooling, CI, or config changes | `chore/ci-node-version` |
 
 ---
 
@@ -121,10 +124,12 @@ Use the following prefixes for your branches:
 We follow a simplified [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ```
-<type>: <short description>
+<type>(<optional scope>): <short description>
 
 [optional body with more detail]
 ```
+
+Common scopes: `frontend`, `api`, `inference`, `worker`, `db`, `infra`.
 
 **Types:**
 - `feat` — A new feature
@@ -133,13 +138,16 @@ We follow a simplified [Conventional Commits](https://www.conventionalcommits.or
 - `style` — Formatting, whitespace (no logic change)
 - `refactor` — Code restructuring (no behavior change)
 - `test` — Adding or updating tests
-- `chore` — Build process, CI, tooling
+- `perf` — Performance improvement
+- `build` — Dependencies or packaging
+- `ci` — CI workflow changes
+- `chore` — Housekeeping, tooling
 
 **Examples:**
 ```
-feat: add scan history export to CSV
-fix: resolve RLS policy blocking profile reads
-docs: add superuser creation guide to README
+feat(frontend): add scan history export to CSV
+fix(worker): requeue jobs when the database is unreachable
+docs: add migration steps to the deploy runbook
 ```
 
 ---
@@ -166,7 +174,8 @@ docs: add superuser creation guide to README
 ### PR Checklist
 
 - [ ] Code follows the project's style guidelines
-- [ ] No hardcoded secrets, API keys, or credentials
+- [ ] CI is green (lint, tests, predictor smoke test, Terraform checks)
+- [ ] No hardcoded secrets, API keys, credentials, or `terraform.tfvars`
 - [ ] UI changes tested across Chrome and Firefox
 - [ ] New features are documented (README or inline)
 - [ ] Existing functionality is not broken
@@ -183,23 +192,36 @@ docs: add superuser creation guide to README
 - **JSDoc**: Add JSDoc comments to all exported components and functions
 - **No magic values**: Use named constants for colors, spacing, and breakpoints
 
-### Backend (Node.js / Express)
+### API (Node.js / Lambda)
 
 - **ES Modules**: Use `import/export` syntax
-- **Error handling**: Always catch and return meaningful error responses
-- **Middleware**: Keep route handlers thin — extract logic into controllers
+- **Routes take their dependencies**: `(req, { db, presignUpload })`, so tests can pass fakes; add a test for every new route or rule
+- **Scope every query to the trial session**; never trust IDs from the request body
+- **Errors**: throw `HttpError` with a clear message; unexpected errors must not leak details
 
-### Inference Engine (Python / FastAPI)
+### Inference Engine & Worker (Python)
 
 - **Type hints**: Use Python type annotations on all function signatures
 - **Docstrings**: Include docstrings on public functions
-- **Dependencies**: Pin versions in `requirements.txt`
+- **Dependencies**: Serving needs go in `requirements.txt`, worker-only in `requirements-worker.txt`, training-only in `requirements-train.txt`
+- **The worker never crashes on bad input**: decide for each new failure whether it retries (transient) or fails the job (permanent)
+
+### Database
+
+- **Never edit a migration that has run on RDS** — add a new numbered file in `db/migrations/`
+- **Grant the minimum**: new columns need explicit grants for `sightx_api` or `sightx_worker`
+
+### Infrastructure (Terraform)
+
+- **Run `terraform fmt`** before committing; CI rejects unformatted files
+- **Explain cost and security choices** in comments next to the resource, and record bigger decisions in `Docs/decisions/`
+- **Never commit `terraform.tfvars`** or state
 
 ---
 
 ## Reporting Bugs
 
-Use the [Bug Report template](https://github.com/BibeshT-TXST/Project-SightX/issues/new?template=bug_report.md) to file an issue. Please include:
+Use the [Bug Report template](https://github.com/BibeshT-TXST/SightX/issues/new?template=bug_report.md) to file an issue. Please include:
 
 - **Environment**: OS, browser, Node/Python version
 - **Steps to reproduce**: Minimal steps to trigger the bug
@@ -210,7 +232,7 @@ Use the [Bug Report template](https://github.com/BibeshT-TXST/Project-SightX/iss
 
 ## Requesting Features
 
-Use the [Feature Request template](https://github.com/BibeshT-TXST/Project-SightX/issues/new?template=feature_request.md) to propose an idea. Please describe:
+Use the [Feature Request template](https://github.com/BibeshT-TXST/SightX/issues/new?template=feature_request.md) to propose an idea. Please describe:
 
 - The **problem** you're trying to solve
 - Your **proposed solution**
@@ -225,7 +247,8 @@ SightX operates in the medical AI space. All contributors must uphold the follow
 > [!CAUTION]
 > **Patient safety is non-negotiable.** Any contribution that modifies the AI inference pipeline, risk classification logic, or diagnostic output must be reviewed with extreme care.
 
-- **No real patient data** in issues, PRs, or test fixtures. Use synthetic data only.
+- **No real patient data** in issues, PRs, test fixtures, or the hosted trial. Use synthetic data only.
+- **Keep identifiers away from the model** — Bedrock prompts may contain dates, tiers and decisions, never names or patient IDs.
 - **Do not weaken safety thresholds** — the asymmetric cost matrix and Bayesian priors exist to prevent missed diagnoses.
 - **Clinical accuracy over cosmetics** — if a change improves visuals but risks misrepresenting diagnostic output, it will be rejected.
 - **Accessibility matters** — ensure UI contributions meet WCAG 2.1 AA contrast and interaction standards.

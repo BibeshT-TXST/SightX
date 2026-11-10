@@ -1,8 +1,9 @@
 # Ignore the massive dataset
 data/
 
-# Ignore trained model checkpoints
-# checkpoints/
+# Model checkpoints are tracked on purpose: checkpoints/best_model.pt is
+# baked into the worker image and loaded by the CI predictor test.
+# (Set MODEL_WEIGHTS_S3_URI to load weights from S3 instead.)
 
 # Ignore Python cache and environment
 __pycache__/

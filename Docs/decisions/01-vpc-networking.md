@@ -15,8 +15,12 @@ The database and Lambdas must stay private, the inference worker must reach AWS 
 - The VPC's main route table is adopted (aws_default_route_table) as the private table, so a subnet without an association fails closed with no internet
 - The default security group is adopted and stripped of all rules (Security Hub control EC2.2 / CIS)
 - Free S3 gateway endpoint on both route tables
-- Four security groups, rules reference groups by ID. Named sightx-* because AWS forbids names starting with "sg-"
+- Three security groups (`sightx-lambda`, `sightx-worker`, `sightx-rds`), rules reference groups by ID. Named sightx-* because AWS forbids names starting with "sg-"
 - Cost of this step: $0/month
+
+### Update (November 2026):
+- The fourth group, `sightx-endpoints`, and its HTTPS-from-Lambda rule were removed. They were reserved for a Bedrock interface endpoint, but Bedrock suggestions moved onto the worker, which already reaches AWS APIs through its public IP (see 06). No interface endpoint is planned, saving ~$7–15/month
+- Rule that keeps the network free: nothing in the private subnets may need the internet. The API Lambda only talks to RDS and signs S3 uploads locally (see 05)
 
 ## What could change in the future:
 - A hospital or production deployment would move the worker to a private subnet and pay for a NAT gateway or interface endpoints, as security is more important than a bit of the cost

@@ -1,16 +1,12 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import TopNavBar from './components/layout/TopNavBar';
 import HeroSection from './components/home/HeroSection';
 import BentoGrid from './components/home/BentoGrid';
 import Footer from './components/layout/Footer';
-import LoginPage from './pages/LoginPage';
 import RetinalScanPage from './pages/RetinalScanPage';
 import AccountsPage from './pages/AccountsPage';
 import LegalsPage from './pages/LegalsPage';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import { AuthProvider } from './context/AuthContext';
-import AdminCreateUserPage from './pages/AdminCreateUserPage';
 
 /**
  * LandingPage component serves as the public-facing entry point of the application.
@@ -30,25 +26,23 @@ function LandingPage() {
 }
 
 /**
- * App component defines the application's routing structure and global providers.
- * Includes both public routes and protected clinical routes.
+ * App component defines the application's routing structure.
+ * V2 is an open trial: every route is public, and each browser gets its
+ * own anonymous session (see lib/session.js).
  */
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin/create-user" element={<AdminCreateUserPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<RetinalScanPage />} />
-            <Route path="/dashboard/accounts" element={<AccountsPage />} />
-            <Route path="/dashboard/legals" element={<LegalsPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<RetinalScanPage />} />
+        <Route path="/dashboard/accounts" element={<AccountsPage />} />
+        <Route path="/dashboard/legals" element={<LegalsPage />} />
+        {/* V1 sign-in links now go straight to the trial */}
+        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

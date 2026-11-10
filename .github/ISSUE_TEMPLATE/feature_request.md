@@ -18,10 +18,10 @@ Describe the feature or change you'd like to see implemented.
 Which part(s) of SightX would this affect?
 
 - [ ] Frontend (UI / UX)
-- [ ] Backend (API / Logic)
-- [ ] Inference Engine (AI / ML Pipeline)
-- [ ] Database / Auth (Supabase)
-- [ ] DevOps / Docker
+- [ ] API (Lambda / Logic)
+- [ ] Inference Engine / Worker (AI / ML Pipeline)
+- [ ] Database (Postgres)
+- [ ] Infrastructure (Terraform / AWS)
 - [ ] Documentation
 
 ## Alternatives Considered

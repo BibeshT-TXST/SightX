@@ -1,15 +1,20 @@
-# ── SightX Inference Engine: Core Dependencies ──
+# ── SightX Inference Engine: Runtime Dependencies ──
 # ─────────────────────────────────────────────
-# This file defines the clinical-grade toolset required for 
-# ResNet-50 inference and image processing orchestration.
+# Only what serving a prediction needs (main.py, predictor.py and the
+# modules they import). Training and evaluation extras live in
+# requirements-train.txt.
+#
+# The Docker image installs CPU-only torch/torchvision before this file,
+# so pip keeps those builds instead of pulling the multi-GB CUDA wheels.
+
+# Model and image pipeline
 torch
 torchvision
 Pillow
-pandas
 numpy
-scikit-learn
-opencv-python-headless
-matplotlib
+scipy            # temperature_calibration.py
+
+# HTTP server
 fastapi
 uvicorn
-python-multipart
+python-multipart # multipart/form-data uploads in main.py
