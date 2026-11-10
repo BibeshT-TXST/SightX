@@ -29,3 +29,8 @@ output "api_url" {
   description = "HTTP API base URL for the frontend build (VITE_API_URL)"
   value       = trimsuffix(aws_apigatewayv2_stage.default.invoke_url, "/")
 }
+
+output "worker_asg_name" {
+  description = "Auto Scaling group of the worker; find its instance ID here for SSM sessions"
+  value       = aws_autoscaling_group.worker.name
+}

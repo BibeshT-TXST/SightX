@@ -49,3 +49,46 @@ variable "api_reserved_concurrency" {
   type        = number
   default     = -1
 }
+
+# ── Inference worker ─────────────────────────────────────────────────────────
+
+variable "worker_instance_type" {
+  description = "EC2 type for the worker. Graviton (t4g) is cheapest; x86 types also work (the AMI follows the architecture)."
+  type        = string
+  default     = "t4g.small"
+}
+
+variable "worker_git_url" {
+  description = "Public repository the worker installs itself from."
+  type        = string
+  default     = "https://github.com/BibeshT-TXST/SightX.git"
+}
+
+variable "worker_git_ref" {
+  description = "Branch or tag the worker runs. Changing it replaces the instance."
+  type        = string
+  default     = "main"
+}
+
+variable "worker_tta_passes" {
+  description = "TTA passes per scan (TTA_PASSES). Fewer is faster and cheaper on CPU."
+  type        = number
+  default     = 108
+}
+
+variable "worker_tta_batch_size" {
+  description = "Passes per forward pass (TTA_BATCH_SIZE). 4 keeps a 2 GiB instance within memory."
+  type        = number
+  default     = 4
+}
+
+variable "bedrock_model_id" {
+  description = "Bedrock model or US cross-region inference profile for suggestions (BEDROCK_MODEL_ID)."
+  type        = string
+  default     = "us.amazon.nova-micro-v1:0"
+
+  validation {
+    condition     = startswith(var.bedrock_model_id, "us.")
+    error_message = "Use a US cross-region inference profile ID (us.<model-id>); the worker's IAM policy is written for one."
+  }
+}
